@@ -353,9 +353,9 @@
         <div class="res-row"><span style="color:var(--blue)">POST</span><span style="color:var(--muted)">/v1/bulk/stream (SSE)</span></div>
         <div class="res-row"><span style="color:var(--green)">GET</span><span style="color:var(--muted)">/v1/stats</span></div>
         <div class="res-row"><span style="color:var(--green)">GET</span><span style="color:var(--muted)">/v1/metrics/aggregate</span></div>
-        <div class="res-row"><span style="color:var(--green)">GET</span><span style="color:var(--muted)">/v1/recent</span></div>
+        <div class="res-row"><span style="color:var(--green)">GET</span><span style="color:var(--muted)">/v1/feed</span></div>
         <div class="res-row"><span style="color:var(--green)">GET</span><span style="color:var(--muted)">/v1/history</span></div>
-        <div class="res-row"><span style="color:var(--green)">GET</span><span style="color:var(--muted)">/v1/leaderboard</span></div>
+        <div class="res-row"><span style="color:var(--green)">GET</span><span style="color:var(--muted)">/v1/rankings</span></div>
         <div class="res-row"><span style="color:var(--green)">GET</span><span style="color:var(--muted)">/v1/test-suite</span></div>
         <div class="res-row"><span style="color:var(--green)">GET</span><span style="color:var(--muted)">/v1/report (HTML)</span></div>
         <div class="res-row"><span style="color:var(--green)">GET</span><span style="color:var(--muted)">/docs (Swagger UI)</span></div>
@@ -508,23 +508,23 @@ function renderStats(d) {
 async function refreshAll() {
   const badge=document.getElementById('conn');
   badge.textContent='connecting…';badge.className='conn-badge wait';
-  try {
-    const [stats,agg,lb,recent]=await Promise.all([
-      apiFetch('/v1/stats'),apiFetch('/v1/metrics/aggregate'),
-      apiFetch('/v1/leaderboard'),apiFetch('/v1/recent?limit=6'),
-    ]);
-    renderStats(stats);
-    renderBars(agg.metrics,agg.sample_size);
-    renderLB(lb.leaderboard);
-    renderRecent(recent.evaluations);
-    const vals=Object.values(agg.metrics);
+  const [r0,r1,r2,r3]=await Promise.allSettled([
+    apiFetch('/v1/stats'),apiFetch('/v1/metrics/aggregate'),
+    apiFetch('/v1/rankings'),apiFetch('/v1/feed?limit=6'),
+  ]);
+  let anyOk=false;
+  if(r0.status==='fulfilled'){renderStats(r0.value);anyOk=true;}
+  if(r1.status==='fulfilled'){renderBars(r1.value.metrics,r1.value.sample_size);
+    const vals=Object.values(r1.value.metrics);
     const overall=vals.length?Math.round(vals.reduce((a,b)=>a+b,0)/vals.length*100):0;
     mkDonut(overall);
-    document.getElementById('donut-num').innerHTML=`${overall}%<br><span style="font-size:12px;color:var(--muted);font-weight:400">${stats.total_evaluations.toLocaleString()} evals</span>`;
-    badge.textContent='● Connected';badge.className='conn-badge ok';
-  } catch(e) {
-    console.warn(e);badge.textContent='● Offline';badge.className='conn-badge off';
-  }
+    const tot=r0.status==='fulfilled'?r0.value.total_evaluations.toLocaleString():'—';
+    document.getElementById('donut-num').innerHTML=`${overall}%<br><span style="font-size:12px;color:var(--muted);font-weight:400">${tot} evals</span>`;
+    anyOk=true;}
+  if(r2.status==='fulfilled'){renderLB(r2.value.leaderboard);anyOk=true;}
+  if(r3.status==='fulfilled'){renderRecent(r3.value.evaluations);anyOk=true;}
+  badge.textContent=anyOk?'● Connected':'● Offline';
+  badge.className=anyOk?'conn-badge ok':'conn-badge off';
 }
 
 // ── Page nav ─────────────────────────────────────────────────────────────────

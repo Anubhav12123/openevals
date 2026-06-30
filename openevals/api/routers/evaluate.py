@@ -98,9 +98,14 @@ async def evaluate_sync(
     return result_dict
 
 
-@router.get("/recent")
+@router.get("/feed")
 async def recent_evaluations(limit: int = Query(20, ge=1, le=100)):
     """Return the most recent evaluations."""
+    return {"evaluations": list(_recent_evals)[:limit], "total": _total_count}
+
+# Alias kept for backwards compatibility
+@router.get("/recent", include_in_schema=False)
+async def recent_alias(limit: int = Query(20, ge=1, le=100)):
     return {"evaluations": list(_recent_evals)[:limit], "total": _total_count}
 
 
