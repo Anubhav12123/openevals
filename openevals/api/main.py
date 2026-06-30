@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from prometheus_client import make_asgi_app
@@ -368,6 +368,61 @@ async def dashboard_data():
         "recent": evals[:6],
         "history": h,
     }
+
+
+# ── Server-side Quick Eval form handler (bypasses ABP fetch blocking) ──────────
+@app.post("/eval", include_in_schema=False)
+async def quick_eval_form(request: Request):
+    """Accept a plain HTML form POST, run eval, redirect back with results."""
+    import json as _json
+    import time
+    import urllib.parse
+
+    from fastapi.responses import RedirectResponse
+
+    from openevals.api.routers.evaluate import _store_result
+    from openevals.core import Evaluator
+    from openevals.types import EvaluationRequest
+
+    form = await request.form()
+    prompt = (form.get("prompt") or "").strip()
+    response = (form.get("response") or "").strip()
+    ground_truth = (form.get("ground_truth") or "").strip() or None
+    model_name = (form.get("model_name") or "").strip() or None
+
+    if not prompt or not response:
+        return RedirectResponse("/?eval_error=missing_fields", status_code=303)
+
+    try:
+        req = EvaluationRequest(
+            prompt=prompt,
+            response=response,
+            ground_truth=ground_truth,
+            model_name=model_name,
+        )
+        t0 = time.perf_counter()
+        evaluator = Evaluator(
+            metrics=["hallucination", "coherence", "conciseness", "latency"]
+        )
+        result = await evaluator.evaluate_request(req)
+        latency_ms = (time.perf_counter() - t0) * 1000
+        result_dict = result.model_dump(mode="json")
+        _store_result(req, result_dict, latency_ms)
+        scores = {
+            r["metric_name"]: round(r["score"] * 100)
+            for r in result_dict.get("metric_results", [])
+        }
+        overall = round(sum(scores.values()) / len(scores)) if scores else 0
+        payload = _json.dumps(
+            {"scores": scores, "overall": overall, "latency_ms": round(latency_ms)}
+        )
+        return RedirectResponse(
+            f"/?eval_result={urllib.parse.quote(payload)}", status_code=303
+        )
+    except Exception as e:
+        return RedirectResponse(
+            f"/?eval_error={urllib.parse.quote(str(e))}", status_code=303
+        )
 
 
 # Built-in test suite exposed via API

@@ -218,10 +218,13 @@
       <div id="recent-list"><div class="sk" style="height:24px;margin-bottom:6px;border-radius:6px"></div><div class="sk" style="height:24px;margin-bottom:6px;border-radius:6px"></div><div class="sk" style="height:24px;border-radius:6px"></div></div>
       <div style="margin-top:16px;border-top:.5px solid var(--border);padding-top:12px">
         <div style="font-size:10px;color:var(--muted);margin-bottom:8px;letter-spacing:.05em">QUICK EVAL</div>
-        <input class="inp" id="q-prompt" placeholder="Prompt…"/>
-        <input class="inp" id="q-response" placeholder="Response…"/>
-        <button class="btn btn-teal" id="q-btn" onclick="quickEval()"><i class="ti ti-player-play"></i> Evaluate</button>
-        <div class="api-note">Hits <code style="color:var(--teal)">/v1/evaluate/sync</code></div>
+        <form id="q-form" action="/eval" method="post">
+          <input class="inp" name="prompt" id="q-prompt" placeholder="Prompt…"/>
+          <input class="inp" name="response" id="q-response" placeholder="Response…"/>
+          <input type="hidden" name="model_name" value=""/>
+          <button class="btn btn-teal" id="q-btn" type="submit"><i class="ti ti-player-play"></i> Evaluate</button>
+        </form>
+        <div class="api-note">Hits <code style="color:var(--teal)">/eval</code> (server-side, ABP-safe)</div>
         <div class="res-box" id="q-results"></div>
       </div>
     </div>
@@ -549,24 +552,30 @@ function showPage(name) {
   if(name==='evaluate') loadSuite();
 }
 
-// ── Quick eval (overview) ─────────────────────────────────────────────────────
-async function quickEval() {
-  const p=document.getElementById('q-prompt').value.trim();
-  const r=document.getElementById('q-response').value.trim();
+// ── Quick eval — reads result from URL param after server-side form POST ───────
+function _showEvalResult() {
+  const params=new URLSearchParams(window.location.search);
   const box=document.getElementById('q-results');
-  const btn=document.getElementById('q-btn');
-  if(!p||!r){box.style.display='block';box.innerHTML='<div style="color:var(--red);font-size:12px">Enter both fields.</div>';return;}
-  btn.disabled=true;btn.innerHTML='<i class="ti ti-loader-2 spin"></i> Evaluating…';
-  box.style.display='block';box.innerHTML='<div class="sk" style="height:60px;border-radius:8px"></div>';
-  try {
-    const res=await fetch(`${API}/v1/evaluate/sync`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:p,response:r})});
-    if(!res.ok) throw new Error((await res.json().catch(()=>({}))).detail||res.statusText);
-    const data=await res.json();
-    box.innerHTML=(data.metric_results||[]).map(r=>`<div class="res-row"><span style="color:var(--muted)">${META[r.metric_name]?.label||r.metric_name}</span><span style="font-weight:600;color:${sc(r.score)}">${pct(r.score)}%</span></div>`).join('');
-    await refreshAll();
-  } catch(e) {box.innerHTML=`<div style="color:var(--red);font-size:11px">${e.message}</div>`;}
-  btn.disabled=false;btn.innerHTML='<i class="ti ti-player-play"></i> Evaluate';
+  if(!box) return;
+  if(params.has('eval_error')) {
+    const msg=params.get('eval_error');
+    box.style.display='block';
+    box.innerHTML=`<div style="color:var(--red);font-size:11px">${msg==='missing_fields'?'Enter both prompt and response.':msg}</div>`;
+    history.replaceState(null,'','/');
+    return;
+  }
+  if(params.has('eval_result')) {
+    try {
+      const d=JSON.parse(decodeURIComponent(params.get('eval_result')));
+      const metaLabels={hallucination:'Hallucination guard',coherence:'Coherence',conciseness:'Conciseness',latency:'Latency score'};
+      const rows=Object.entries(d.scores||{}).map(([k,v])=>`<div class="res-row"><span style="color:var(--muted)">${metaLabels[k]||k}</span><span style="font-weight:600;color:${v>=85?'var(--green)':v>=65?'var(--yellow)':'var(--red)'}">${v}%</span></div>`).join('');
+      box.style.display='block';
+      box.innerHTML=`${rows}<div class="res-row" style="border-top:.5px solid var(--border);margin-top:6px;padding-top:6px"><span style="color:var(--muted)">Overall</span><span style="font-weight:700;color:var(--teal)">${d.overall}%</span></div><div style="font-size:10px;color:var(--muted);margin-top:4px">${d.latency_ms}ms · evaluation complete</div>`;
+    } catch(_) {}
+    history.replaceState(null,'','/');
+  }
 }
+document.addEventListener('DOMContentLoaded', _showEvalResult);
 
 // ── Evaluate tab ──────────────────────────────────────────────────────────────
 async function runEval() {
