@@ -58,6 +58,11 @@ def _store_result(
             **{f"score_{k}": v for k, v in scores.items()},
         }
     )
+    # Update per-model leaderboard
+    if request.model_name:
+        from openevals.api.routers.leaderboard import register_eval
+
+        register_eval(request.model_name, scores)
 
 
 def _record_error() -> None:

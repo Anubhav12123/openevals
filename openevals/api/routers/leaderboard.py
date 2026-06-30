@@ -1,71 +1,55 @@
+from __future__ import annotations
+
+from collections import defaultdict
+
 from fastapi import APIRouter
 
 router = APIRouter()
 
-_BENCHMARK_SCORES = [
-    {
-        "rank": 1,
-        "model": "claude-3-5-sonnet-20241022",
-        "faithfulness": 0.94,
-        "relevance": 0.91,
-        "hallucination": 0.96,
-        "coherence": 0.93,
-        "toxicity": 0.99,
-    },
-    {
-        "rank": 2,
-        "model": "gpt-4o",
-        "faithfulness": 0.91,
-        "relevance": 0.93,
-        "hallucination": 0.77,
-        "coherence": 0.92,
-        "toxicity": 0.98,
-    },
-    {
-        "rank": 3,
-        "model": "gpt-4o-mini",
-        "faithfulness": 0.87,
-        "relevance": 0.88,
-        "hallucination": 0.81,
-        "coherence": 0.88,
-        "toxicity": 0.97,
-    },
-    {
-        "rank": 4,
-        "model": "llama-3-70b",
-        "faithfulness": 0.85,
-        "relevance": 0.87,
-        "hallucination": 0.82,
-        "coherence": 0.84,
-        "toxicity": 0.96,
-    },
-    {
-        "rank": 5,
-        "model": "mistral-7b",
-        "faithfulness": 0.80,
-        "relevance": 0.83,
-        "hallucination": 0.78,
-        "coherence": 0.79,
-        "toxicity": 0.95,
-    },
-]
+# Dynamic per-model accumulator — populated by every completed evaluation
+# {model_name: {metric: [score, ...]}}
+_model_scores: dict[str, dict[str, list]] = defaultdict(lambda: defaultdict(list))
+
+
+def register_eval(model_name: str, scores: dict) -> None:
+    """Record evaluation scores for a model. Called by evaluate._store_result."""
+    if not model_name:
+        return
+    for metric, score in scores.items():
+        _model_scores[model_name][metric].append(float(score))
+
+
+def get_leaderboard() -> list[dict]:
+    """Compute ranked leaderboard from accumulated evaluation data."""
+    if not _model_scores:
+        return []
+    ranked = []
+    for model, metrics in _model_scores.items():
+        agg = {m: round(sum(v) / len(v), 4) for m, v in metrics.items()}
+        overall = round(sum(agg.values()) / len(agg), 4) if agg else 0.0
+        eval_count = max(len(v) for v in metrics.values()) if metrics else 0
+        ranked.append(
+            {
+                "model": model,
+                "overall": overall,
+                "eval_count": eval_count,
+                **agg,
+            }
+        )
+    ranked.sort(key=lambda x: -x["overall"])
+    for i, row in enumerate(ranked, 1):
+        row["rank"] = i
+    return ranked
 
 
 @router.get("/rankings")
 async def get_rankings():
-    """Model benchmark scores. Updated after each benchmark run."""
-    return {
-        "leaderboard": _BENCHMARK_SCORES,
-        "note": "19% hallucination gap between Claude-3.5-Sonnet and GPT-4o (p<0.001, Cohen's d=0.82)",
-        "last_updated": "2024-12-01T00:00:00Z",
-    }
+    """Live model leaderboard ranked by average overall score across all metrics."""
+    lb = get_leaderboard()
+    return {"leaderboard": lb, "total_models": len(lb)}
 
 
-# Alias so existing /v1/leaderboard links still work
 @router.get("/leaderboard", include_in_schema=False)
-async def get_leaderboard():
-    return {
-        "leaderboard": _BENCHMARK_SCORES,
-        "note": "19% hallucination gap between Claude-3.5-Sonnet and GPT-4o (p<0.001, Cohen's d=0.82)",
-        "last_updated": "2024-12-01T00:00:00Z",
-    }
+async def get_leaderboard_alias():
+    lb = get_leaderboard()
+    return {"leaderboard": lb, "total_models": len(lb)}

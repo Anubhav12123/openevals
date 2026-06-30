@@ -117,41 +117,68 @@ def leaderboard(
     fmt: str = typer.Option(
         "table", "--format", "-f", help="Output format: table or json"
     ),
+    host: str = typer.Option(
+        "http://localhost:8000", "--host", help="OpenEvals server URL"
+    ),
 ):
-    """Show the current model leaderboard."""
-    data = [
-        {
-            "rank": 1,
-            "model": "claude-3-5-sonnet-20241022",
-            "faithfulness": 0.94,
-            "hallucination": 0.96,
-        },
-        {"rank": 2, "model": "gpt-4o", "faithfulness": 0.91, "hallucination": 0.77},
-        {
-            "rank": 3,
-            "model": "llama-3-70b",
-            "faithfulness": 0.85,
-            "hallucination": 0.82,
-        },
-    ]
+    """Show the live model leaderboard from the running OpenEvals server."""
+    import urllib.error
+    import urllib.request
+
+    try:
+        with urllib.request.urlopen(f"{host}/v1/rankings", timeout=5) as resp:
+            payload = json.loads(resp.read())
+        data = payload.get("leaderboard", [])
+    except (urllib.error.URLError, Exception) as e:
+        console.print(f"[red]Could not connect to {host}: {e}[/red]")
+        console.print(
+            "[dim]Start the server with: uvicorn openevals.api.main:app[/dim]"
+        )
+        raise typer.Exit(1)
+
+    if not data:
+        console.print(
+            "[yellow]No evaluations yet. Submit some via POST /v1/evaluate.[/yellow]"
+        )
+        return
+
     if fmt == "json":
         console.print_json(json.dumps(data))
         return
-    table = Table(title="[bold]OpenEvals Model Leaderboard[/bold]")
+
+    # Determine which metric columns are present across all models
+    metric_cols = []
+    for col in ["overall", "hallucination", "faithfulness", "relevance", "coherence"]:
+        if any(col in row for row in data):
+            metric_cols.append(col)
+
+    table = Table(title="[bold]OpenEvals Live Model Leaderboard[/bold]")
     table.add_column("Rank", style="dim", justify="right")
     table.add_column("Model", style="cyan bold")
-    table.add_column("Faithfulness", justify="right")
-    table.add_column("Hallucination ↑", justify="right")
+    for col in metric_cols:
+        table.add_column(col.title(), justify="right")
+    table.add_column("Evals", justify="right", style="dim")
+
     for row in data:
+        color = (
+            "green"
+            if row.get("overall", 0) >= 0.85
+            else "yellow" if row.get("overall", 0) >= 0.65 else "red"
+        )
+        metric_vals = [
+            f"[{color}]{row[col]:.3f}[/{color}]" if col in row else "—"
+            for col in metric_cols
+        ]
         table.add_row(
             str(row["rank"]),
             row["model"],
-            f"{row['faithfulness']:.2f}",
-            f"{row['hallucination']:.2f}",
+            *metric_vals,
+            str(row.get("eval_count", "—")),
         )
+
     console.print(table)
     console.print(
-        "\n[dim]Key finding: 19% hallucination gap between Claude-3.5-Sonnet and GPT-4o (p<0.001, Cohen's d=0.82)[/dim]"
+        f"\n[dim]{len(data)} model(s) · rankings update live as evaluations complete[/dim]"
     )
 
 

@@ -56,12 +56,14 @@ def _score_badge(s: float) -> str:
 def _bar_html(s: float) -> str:
     pct = int(s * 100)
     color = "#4ade80" if s >= 0.85 else ("#facc15" if s >= 0.65 else "#f87171")
-    return f'<div class="bar-cell"><div class="bar" style="width:{pct}px;background:{color}"></div><span>{pct}%</span></div>'
+    return f'<div class="bar-cell"><div class="bar" style="width:{pct}px;background:{color}"></div><span>{pct}%</span></div>'  # noqa: E501
 
 
 @router.get("/report", response_class=HTMLResponse)
 async def generate_report():
     """Generate a print-ready HTML evaluation report."""
+    from openevals.api.routers.leaderboard import get_leaderboard
+
     evals = list(_recent_evals)
     total = _total_count
     errors = _error_count
@@ -78,49 +80,33 @@ async def generate_report():
         round(sum(e["latency_ms"] for e in evals) / len(evals), 1) if evals else 0
     )
 
-    # Leaderboard
-    lb = [
-        {
-            "rank": 1,
-            "model": "claude-3-5-sonnet-20241022",
-            "hallucination": 0.96,
-            "faithfulness": 0.94,
-            "relevance": 0.91,
-            "coherence": 0.93,
-        },
-        {
-            "rank": 2,
-            "model": "gpt-4o",
-            "hallucination": 0.77,
-            "faithfulness": 0.91,
-            "relevance": 0.93,
-            "coherence": 0.92,
-        },
-        {
-            "rank": 3,
-            "model": "gpt-4o-mini",
-            "hallucination": 0.81,
-            "faithfulness": 0.87,
-            "relevance": 0.88,
-            "coherence": 0.88,
-        },
-        {
-            "rank": 4,
-            "model": "llama-3-70b",
-            "hallucination": 0.82,
-            "faithfulness": 0.85,
-            "relevance": 0.87,
-            "coherence": 0.84,
-        },
-        {
-            "rank": 5,
-            "model": "mistral-7b",
-            "hallucination": 0.78,
-            "faithfulness": 0.80,
-            "relevance": 0.83,
-            "coherence": 0.79,
-        },
-    ]
+    # Live leaderboard from actual evaluations
+    lb = get_leaderboard()
+
+    # Key finding: derive from actual data
+    if len(lb) >= 2:
+        top = lb[0]
+        second = lb[1]
+        diff_pct = round((top["overall"] - second["overall"]) * 100, 1)
+        finding_html = (
+            f"<h3>Key Finding: {top['model']} leads with {top['overall']*100:.1f}% overall score</h3>"
+            f"<p>Based on <b>{total} live evaluations</b> across {len(lb)} models, "
+            f"<b>{top['model']}</b> scores <b>{top['overall']*100:.1f}%</b> vs "
+            f"<b>{second['model']}</b> at <b>{second['overall']*100:.1f}%</b> "
+            f"({diff_pct:+.1f}pp gap). Rankings update in real-time as evaluations complete.</p>"
+        )
+    elif len(lb) == 1:
+        top = lb[0]
+        finding_html = (
+            f"<h3>Current Leader: {top['model']} ({top['overall']*100:.1f}% overall)</h3>"
+            f"<p>Based on <b>{total} live evaluations</b>. Submit evaluations with different "
+            f"model names to populate the full leaderboard.</p>"
+        )
+    else:
+        finding_html = (
+            "<h3>No evaluations yet</h3>"
+            "<p>Submit evaluations via <code>POST /v1/evaluate</code> to populate this report.</p>"
+        )
 
     # Metric rows
     metric_rows = (
@@ -136,26 +122,38 @@ async def generate_report():
     )
 
     # Leaderboard rows
-    lb_rows = "".join(
-        f"<tr><td>{r['rank']}</td><td><b>{r['model']}</b></td>"
-        f"<td>{_score_badge(r['hallucination'])}</td>"
-        f"<td>{_score_badge(r['faithfulness'])}</td>"
-        f"<td>{_score_badge(r['relevance'])}</td>"
-        f"<td>{_score_badge(r['coherence'])}</td></tr>"
-        for r in lb
+    metrics_to_show = ["hallucination", "faithfulness", "relevance", "coherence"]
+    lb_header = "".join(
+        f"<th>{m.replace('_', ' ').title()} ↑</th>" for m in metrics_to_show
+    )
+    lb_rows = (
+        "".join(
+            f"<tr><td>{r['rank']}</td><td><b>{r['model']}</b></td>"
+            + "".join(
+                f"<td>{_score_badge(r[m])}</td>" if m in r else "<td>—</td>"
+                for m in metrics_to_show
+            )
+            + f"<td>{r.get('eval_count', 0)}</td></tr>"
+            for r in lb
+        )
+        if lb
+        else "<tr><td colspan='6' style='text-align:center;color:#94a3b8'>No model evaluations yet</td></tr>"
     )
 
     # Recent evals rows
     recent_rows = (
         "".join(
-            f"<tr><td style='max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'>{ev['prompt']}</td>"
+            f"<tr>"
+            f"<td style='max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'>{ev['prompt']}</td>"  # noqa: E501
+            f"<td>{ev.get('model_name') or '—'}</td>"
             f"<td>{_score_badge(ev['overall_score'])}</td>"
             f"<td>{ev['latency_ms']}ms</td>"
-            f"<td style='font-size:11px;color:#94a3b8'>{ev['created_at'][:16].replace('T',' ')}</td></tr>"  # noqa: E231
+            f"<td style='font-size:11px;color:#94a3b8'>{ev['created_at'][:16].replace('T',' ')}</td>"  # noqa: E231,E501
+            f"</tr>"
             for ev in evals[:15]
         )
         if evals
-        else "<tr><td colspan='4' style='text-align:center;color:#94a3b8'>No evaluations yet</td></tr>"
+        else "<tr><td colspan='5' style='text-align:center;color:#94a3b8'>No evaluations yet</td></tr>"
     )
 
     error_rate = round(errors / total * 100, 2) if total > 0 else 0
@@ -168,10 +166,10 @@ async def generate_report():
 <style>{_REPORT_CSS}</style>
 </head>
 <body>
-<button class="print-btn no-print" onclick="window.print()">⬇ Download as PDF (Print → Save as PDF)</button>
+<button class="print-btn no-print" onclick="window.print()">&#11015; Download as PDF (Print &rarr; Save as PDF)</button>
 
 <h1>OpenEvals Evaluation Report</h1>
-<div class="subtitle">Generated {now} · OpenEvals v0.1.0 · github.com/Anubhav12123/openevals</div>
+<div class="subtitle">Generated {now} &middot; OpenEvals v0.1.0 &middot; github.com/Anubhav12123/openevals</div>
 
 <h2>Executive Summary</h2>
 <div class="summary-grid">
@@ -182,11 +180,7 @@ async def generate_report():
 </div>
 
 <div class="finding-box">
-  <h3>Key Finding: 19% Hallucination Gap Between Top Models</h3>
-  <p>OpenEvals benchmarks on TruthfulQA (817 samples) and domain-specific technical QA (500 samples) reveal
-  a statistically significant gap: <b>Claude-3.5-Sonnet scores 0.96 vs GPT-4o at 0.77</b> on hallucination
-  detection (p &lt; 0.001, Cohen's d = 0.82 — large effect size). Both models perform similarly on
-  relevance and coherence; the gap is concentrated in factual accuracy on technical domains.</p>
+  {finding_html}
 </div>
 
 <h2>Metric Performance</h2>
@@ -195,15 +189,15 @@ async def generate_report():
   {metric_rows}
 </table>
 
-<h2>Model Leaderboard (Hallucination Benchmark)</h2>
+<h2>Model Leaderboard (Live Rankings)</h2>
 <table>
-  <tr><th>#</th><th>Model</th><th>Hallucination ↑</th><th>Faithfulness</th><th>Relevance</th><th>Coherence</th></tr>
+  <tr><th>#</th><th>Model</th>{lb_header}<th>Evals</th></tr>
   {lb_rows}
 </table>
 
 <h2>Recent Evaluations ({min(len(evals), 15)} of {total})</h2>
 <table>
-  <tr><th>Prompt</th><th>Overall Score</th><th>Latency</th><th>Timestamp</th></tr>
+  <tr><th>Prompt</th><th>Model</th><th>Overall Score</th><th>Latency</th><th>Timestamp</th></tr>
   {recent_rows}
 </table>
 
@@ -212,12 +206,12 @@ async def generate_report():
 Evaluations use a hybrid approach: heuristic fallbacks (entity overlap, length analysis, structural scoring)
 are used when LLM judge API keys are not configured, and upgraded to GPT-4o / Claude judges when keys are
 provided. Bootstrap confidence intervals (1,000 iterations) are computed for aggregate scores. Statistical
-comparisons use Welch's t-test with Bonferroni correction for multiple comparisons.
+comparisons use Welch&apos;s t-test with Bonferroni correction for multiple comparisons.
 </p>
 
 <div class="footer">
-  OpenEvals · Open-source LLM Evaluation Framework · Built by Anubhav Dixit, Michigan State University<br/>
-  Apache 2.0 License · github.com/Anubhav12123/openevals
+  OpenEvals &middot; Open-source LLM Evaluation Framework &middot; Built by Anubhav Dixit, Michigan State University<br/>
+  Apache 2.0 License &middot; github.com/Anubhav12123/openevals
 </div>
 </body>
 </html>"""

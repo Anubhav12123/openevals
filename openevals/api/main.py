@@ -73,7 +73,7 @@ if _DASHBOARD_DIR.exists():
             _recent_evals,
             _total_count,
         )
-        from openevals.api.routers.leaderboard import _BENCHMARK_SCORES
+        from openevals.api.routers.leaderboard import get_leaderboard
 
         evals = list(_recent_evals)
         avg_latency = (
@@ -102,7 +102,7 @@ if _DASHBOARD_DIR.exists():
                 "session_evals_stored": len(evals),
             },
             "metrics": {"metrics": metrics_agg, "sample_size": len(evals)},
-            "leaderboard": _BENCHMARK_SCORES,
+            "leaderboard": get_leaderboard(),
             "recent": evals[:6],
         }
         html = (_DASHBOARD_DIR / "index.html").read_text()
@@ -141,14 +141,15 @@ if _DASHBOARD_DIR.exists():
         def _pill(s: float) -> str:
             return "pg" if s >= 0.85 else "py" if s >= 0.65 else "pr"
 
+        _lb = get_leaderboard()
         lb_html = "".join(
             f'<div class="lb-row">'
             f'<span class="lb-rank">{r["rank"]}</span>'
             f'<i class="ti ti-cpu" style="font-size:12px;color:var(--muted)"></i>'
             f'<span class="lb-name">{r["model"]}</span>'
-            f'<span class="pill {_pill(r["hallucination"])}">'
-            f'{r["hallucination"]:.2f}</span></div>'
-            for r in _BENCHMARK_SCORES
+            f'<span class="pill {_pill(r["overall"])}">'
+            f'{r["overall"]:.2f}</span></div>'
+            for r in _lb
         )
         html = _re.sub(
             r'id="lb-rows">.*?</div>',
@@ -263,51 +264,61 @@ _SEED_SAMPLES = [
         "prompt": "What is the capital of France?",
         "response": "The capital of France is Paris, which has been the country's capital since the late 10th century.",
         "ground_truth": "Paris",
+        "model_name": "claude-3-5-sonnet",
     },
     {
         "prompt": "Explain what machine learning is.",
         "response": "Machine learning is a subset of artificial intelligence that enables systems to learn and improve from experience without being explicitly programmed, by training on data.",
         "ground_truth": "A subset of AI that learns from data",
+        "model_name": "gpt-4o",
     },
     {
         "prompt": "What causes rainbows?",
         "response": "Rainbows are caused by the refraction, dispersion, and reflection of sunlight inside water droplets, splitting white light into its spectrum of colors.",
         "ground_truth": "Refraction and reflection of light in water droplets",
+        "model_name": "gpt-4o-mini",
     },
     {
         "prompt": "Who wrote Romeo and Juliet?",
         "response": "Romeo and Juliet was written by William Shakespeare, believed to have been written between 1594 and 1596.",
         "ground_truth": "William Shakespeare",
+        "model_name": "llama-3-70b",
     },
     {
         "prompt": "What is photosynthesis?",
         "response": "Photosynthesis is the process by which green plants, algae, and some bacteria convert sunlight, water, and carbon dioxide into glucose and oxygen.",
         "ground_truth": "Converting sunlight to energy in plants",
+        "model_name": "mistral-7b",
     },
     {
         "prompt": "What is the boiling point of water?",
         "response": "Water boils at 100 degrees Celsius (212 degrees Fahrenheit) at standard atmospheric pressure.",
         "ground_truth": "100°C / 212°F at sea level",
+        "model_name": "claude-3-5-sonnet",
     },
     {
         "prompt": "Who painted the Mona Lisa?",
         "response": "The Mona Lisa was painted by Leonardo da Vinci, created between approximately 1503 and 1519.",
         "ground_truth": "Leonardo da Vinci",
+        "model_name": "gpt-4o",
     },
     {
         "prompt": "What planet is closest to the Sun?",
         "response": "Mercury is the closest planet to the Sun in our solar system.",
         "ground_truth": "Mercury",
+        "model_name": "gpt-4o-mini",
     },
     {
         "prompt": "Explain what a neural network is.",
         "response": "A neural network is a computational model inspired by the human brain, consisting of layers of interconnected nodes that learn patterns from data through training.",
         "ground_truth": "A brain-inspired model for learning patterns",
+        "model_name": "llama-3-70b",
     },
     {
         "prompt": "What is the speed of light?",
         "response": "The speed of light in a vacuum is approximately 299,792,458 metres per second, often rounded to 3×10⁸ m/s.",
         "ground_truth": "~299,792,458 m/s",
+        "model_name": "mistral-7b",
     },
 ]
 
@@ -322,7 +333,7 @@ async def dashboard_data():
         _recent_evals,
         _total_count,
     )
-    from openevals.api.routers.leaderboard import _BENCHMARK_SCORES
+    from openevals.api.routers.leaderboard import get_leaderboard
 
     evals = list(_recent_evals)
     avg_latency = (
@@ -353,7 +364,7 @@ async def dashboard_data():
             "session_evals_stored": len(evals),
         },
         "metrics": {"metrics": metrics_agg, "sample_size": len(evals)},
-        "leaderboard": _BENCHMARK_SCORES,
+        "leaderboard": get_leaderboard(),
         "recent": evals[:6],
         "history": h,
     }
@@ -381,6 +392,7 @@ async def seed_evaluations() -> None:
                 prompt=sample["prompt"],
                 response=sample["response"],
                 ground_truth=sample.get("ground_truth"),
+                model_name=sample.get("model_name"),
             )
             # Only lightweight heuristic metrics — no model downloads
             metrics = ["hallucination", "coherence", "conciseness", "latency"]
