@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>PromptGuard</title>
+  <link rel="stylesheet" href="popup.css"/>
+</head>
+<body>
+
+  <div class="header">
+    <div class="glow-blob"></div>
+    <div class="logo-row">
+      <span class="logo-shield">🛡</span>
+      <div class="logo-info">
+        <span class="logo-name">PromptGuard</span>
+        <span class="logo-sub">AI Hallucination Monitor</span>
+      </div>
+      <div class="pill-live"><span class="dot"></span>Active</div>
+    </div>
+  </div>
+
+  <div class="hero">
+    <!-- Ring -->
+    <div class="ring-wrap">
+      <svg class="ring-svg" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+        <circle class="ring-bg"   cx="60" cy="60" r="46"/>
+        <circle class="ring-arc"  cx="60" cy="60" r="46" id="ring-arc"
+                stroke-dasharray="0 289" stroke-linecap="round"/>
+      </svg>
+      <div class="ring-center">
+        <div class="ring-num" id="ring-num">—</div>
+        <div class="ring-lbl">avg risk</div>
+      </div>
+    </div>
+
+    <!-- Side stats -->
+    <div class="side-stats">
+      <div class="side-stat">
+        <div class="ss-num" id="stat-total">0</div>
+        <div class="ss-lbl">Responses<br/>evaluated</div>
+      </div>
+      <div class="ss-sep"></div>
+      <div class="side-stat">
+        <div class="ss-num danger" id="stat-high">0</div>
+        <div class="ss-lbl">High risk<br/>caught</div>
+      </div>
+      <div class="ss-sep"></div>
+      <div class="side-stat">
+        <div class="ss-num safe" id="stat-safe">—</div>
+        <div class="ss-lbl">Session<br/>protection</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Protection bar -->
+  <div class="pbar-wrap">
+    <div class="pbar-labels">
+      <span>Session protection</span>
+      <span id="pbar-pct" class="pbar-pct">—</span>
+    </div>
+    <div class="pbar-track"><div class="pbar-fill" id="pbar-fill" style="width:0%"></div></div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- History -->
+  <div class="history-head">Recent activity</div>
+  <div class="history" id="history">
+    <div class="empty">
+      <div class="empty-emoji">💬</div>
+      <div class="empty-title">No activity yet</div>
+      <div class="empty-body">Open ChatGPT, Claude, or Gemini<br/>and ask a question to start</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span class="fdot c1">●</span>ChatGPT
+    <span class="fdot c2">●</span>Claude
+    <span class="fdot c3">●</span>Gemini
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
