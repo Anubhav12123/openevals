@@ -107,160 +107,95 @@
 
 /* ── Suggestion popup ────────────────────────────────────────────────────────── */
 
+.pg-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 999998;
+  animation: pg-fade 0.2s ease;
+}
+
+@keyframes pg-fade { from { opacity:0 } to { opacity:1 } }
+
 .pg-popup {
-  position: absolute;
+  position: fixed;
+  top: 50%;
   left: 50%;
-  transform: translateX(-50%);
-  width: min(560px, 92vw);
+  transform: translate(-50%, -50%);
+  width: min(520px, 92vw);
   z-index: 999999;
   background: #1a1a2e;
-  border: 1px solid rgba(239, 68, 68, 0.35);
   border-radius: 16px;
-  box-shadow: 0 24px 64px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.04);
+  padding: 12px;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.7);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  animation: pg-popup-in 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
-  overflow: hidden;
+  animation: pg-popup-in 0.25s cubic-bezier(0.34, 1.4, 0.64, 1);
 }
 
 @keyframes pg-popup-in {
-  from { opacity: 0; transform: translateX(-50%) translateY(12px) scale(0.97); }
-  to   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+  from { opacity: 0; transform: translate(-50%, -47%) scale(0.95); }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 }
 
-.pg-popup-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  padding: 18px 20px 14px;
-  gap: 12px;
-}
-
-.pg-popup-title-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-}
-
-.pg-popup-icon {
-  font-size: 22px;
-  line-height: 1;
-  margin-top: 1px;
-  flex-shrink: 0;
-}
-
-.pg-popup-title {
-  font-size: 15px;
-  font-weight: 700;
-  color: #ef4444;
-  line-height: 1.3;
-}
-
-.pg-popup-sub {
-  font-size: 12px;
-  color: rgba(255,255,255,0.45);
-  margin-top: 3px;
-  line-height: 1.4;
-}
-
-.pg-popup-close {
-  background: none;
-  border: none;
-  color: rgba(255,255,255,0.3);
-  font-size: 16px;
-  cursor: pointer;
-  padding: 0;
-  line-height: 1;
-  flex-shrink: 0;
-  transition: color 0.15s;
-}
-
-.pg-popup-close:hover { color: rgba(255,255,255,0.7); }
-
-.pg-popup-divider {
-  height: 1px;
-  background: rgba(255,255,255,0.07);
-  margin: 0 20px;
-}
-
-.pg-popup-body {
-  padding: 16px 20px 14px;
-}
-
-.pg-popup-hint {
-  font-size: 11px;
-  font-weight: 600;
-  color: rgba(255,255,255,0.35);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  margin-bottom: 12px;
-}
+.pg-popup-header, .pg-popup-title-row, .pg-popup-icon,
+.pg-popup-title, .pg-popup-sub, .pg-popup-close,
+.pg-popup-divider, .pg-popup-body, .pg-popup-hint { display: none; }
 
 .pg-suggestion {
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 12px 14px;
-  border-radius: 10px;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 12px;
   background: rgba(255,255,255,0.04);
   border: 1px solid rgba(255,255,255,0.07);
   margin-bottom: 8px;
-  transition: background 0.15s, border-color 0.15s;
+  transition: background 0.15s;
 }
 
 .pg-suggestion:last-child { margin-bottom: 0; }
-
-.pg-suggestion:hover {
-  background: rgba(255,255,255,0.07);
-  border-color: rgba(255,255,255,0.12);
-}
+.pg-suggestion:hover { background: rgba(255,255,255,0.07); }
 
 .pg-suggestion-num {
-  width: 22px;
-  height: 22px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
-  background: rgba(99, 102, 241, 0.25);
-  color: #818cf8;
-  font-size: 11px;
+  background: rgba(99,102,241,0.3);
+  color: #a5b4fc;
+  font-size: 12px;
   font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  margin-top: 1px;
 }
 
 .pg-suggestion-text {
   flex: 1;
   font-size: 13px;
-  color: rgba(255,255,255,0.82);
-  line-height: 1.55;
+  color: rgba(255,255,255,0.8);
+  line-height: 1.5;
 }
 
 .pg-use-btn {
   flex-shrink: 0;
-  padding: 5px 12px;
+  padding: 7px 16px;
   border-radius: 8px;
-  border: 1px solid rgba(99, 102, 241, 0.4);
-  background: rgba(99, 102, 241, 0.15);
-  color: #818cf8;
-  font-size: 11px;
+  border: 1px solid rgba(99,102,241,0.5);
+  background: rgba(99,102,241,0.15);
+  color: #a5b4fc;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   font-family: inherit;
   white-space: nowrap;
-  transition: background 0.15s, transform 0.1s;
-  margin-top: 1px;
+  transition: all 0.15s;
 }
 
 .pg-use-btn:hover {
-  background: rgba(99, 102, 241, 0.3);
-  transform: scale(1.03);
+  background: rgba(99,102,241,0.28);
+  border-color: #818cf8;
 }
 
-.pg-popup-footer {
-  padding: 10px 20px;
-  font-size: 10px;
-  color: rgba(255,255,255,0.2);
-  border-top: 1px solid rgba(255,255,255,0.06);
-  letter-spacing: 0.03em;
-}

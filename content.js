@@ -1,10 +1,7 @@
-// PromptGuard — content.js
-// Injected into ChatGPT, Claude, and Gemini pages
+// OpenEvals — content.js
 
 const PLATFORM = detectPlatform();
-const processed = new WeakSet();
-
-// ── Platform detection ────────────────────────────────────────────────────────
+if (PLATFORM) setup();
 
 function detectPlatform() {
   const h = location.hostname;
@@ -14,109 +11,95 @@ function detectPlatform() {
   return null;
 }
 
-// Selectors for each platform
+function setup() {
+
 const SELECTORS = {
-  chatgpt: {
-    response: '[data-message-author-role="assistant"]',
-    text: '.markdown, .whitespace-pre-wrap',
-    input: '#prompt-textarea',
-  },
-  claude: {
-    response: '[data-testid="assistant-message"]',
-    text: '.font-claude-message',
-    input: '.ProseMirror',
-  },
-  gemini: {
-    response: 'model-response',
-    text: '.response-content, .markdown, p',
-    input: '.ql-editor, rich-textarea .ql-editor',
-  },
+  chatgpt: { response: '[data-message-author-role="assistant"]', text: '.markdown, .whitespace-pre-wrap', input: '#prompt-textarea' },
+  claude:  { response: '[data-testid="assistant-message"]',      text: '.font-claude-message',            input: '.ProseMirror' },
+  gemini:  { response: 'message-content, model-response',        text: '.markdown, p',                    input: 'rich-textarea .ql-editor, .ql-editor' },
 };
 
-// ── Hallucination scoring ─────────────────────────────────────────────────────
+const sel = SELECTORS[PLATFORM].response;
 
-function scoreHallucination(text) {
-  if (!text || text.length < 30) return { risk: 0.5, level: 'medium', pct: 50 };
+// Mark all responses already on the page as "old" — no auto-popup for these
+document.querySelectorAll(sel).forEach(el => {
+  el.dataset.pgOld = '1';
+  el.dataset.pgDone = '1'; // don't re-score old responses either
+});
 
+// ── Scoring ───────────────────────────────────────────────────────────────────
+
+function score(text) {
   const lower = text.toLowerCase();
-  let risk = 0;
+  let risk = 0.10;
 
-  const HIGH_RISK = [
-    /i('m| am) not (sure|certain|aware)/g,
-    /i (think|believe|suppose|guess)\b/g,
-    /it('s| is) (possible|likely) that/g,
-    /\bmight be\b/g,
-    /\bcould be\b/g,
-    /i may be wrong/g,
-    /if i recall correctly/g,
-    /to (my|the best of my) knowledge/g,
-    /as far as i know/g,
-    /i('m| am) not 100/g,
-    /i cannot (verify|confirm|guarantee)/g,
-    /my (knowledge|training) cutoff/g,
-    /i don't have (access|information) (to|about)/g,
-  ];
-
-  const MED_RISK = [
-    /\bapproximately\b/g,
-    /\baround \d/g,
-    /\broughly\b/g,
-    /\bseems? (to|like)\b/g,
-    /\bappears? (to|like)\b/g,
-    /\bgenerally\b/g,
-    /\btypically\b/g,
-    /\busually\b/g,
-    /\bsomething like\b/g,
-    /\bi'm not 100% sure\b/g,
-  ];
-
-  const CONFIDENT = [
-    /according to (studies|research|data|reports)/g,
-    /\bspecifically\b/g,
-    /research (shows|indicates|demonstrates|confirms)/g,
-    /it (is|was|has been) (proven|established|confirmed)/g,
-    /\bthe (fact|answer) is\b/g,
-    /\bexactly\b/g,
-  ];
-
-  HIGH_RISK.forEach(p => {
-    const m = lower.match(p);
-    if (m) risk += m.length * 0.14;
-  });
-  MED_RISK.forEach(p => {
-    const m = lower.match(p);
-    if (m) risk += m.length * 0.06;
-  });
-  CONFIDENT.forEach(p => {
-    const m = lower.match(p);
-    if (m) risk -= m.length * 0.05;
+  [
+    [0.15, [/i('m| am) not (sure|certain|aware)/g, /i (think|believe|suppose|guess)\b/g,
+            /it('s| is) (possible|likely) that/g, /\bmight\b/g, /\bcould be\b/g,
+            /i may be wrong/g, /if i recall correctly/g, /to (my|the best of my) knowledge/g,
+            /as far as i know/g, /i cannot (verify|confirm|guarantee)/g,
+            /my (knowledge|training) (cutoff|data)/g, /i don't have (access|information)/g,
+            /\buncertain\b/g, /\bpossibly\b/g, /\bperhaps\b/g, /\bprobably\b/g,
+            /\bi'd (guess|say|estimate)\b/g, /\bspeculat/g, /\bhypothet/g]],
+    [0.06, [/\bapproximately\b/g, /\baround \d/g, /\broughly\b/g, /\bseems?\b/g,
+            /\bappears?\b/g, /\bgenerally\b/g, /\btypically\b/g, /\busually\b/g,
+            /\boften\b/g, /\bmay\b/g, /\bsomewhat\b/g, /\blikely\b/g, /\bpotentially\b/g]],
+    [-0.05,[/according to (studies|research|data|reports)/g,
+            /research (shows|indicates|demonstrates|confirms)/g,
+            /it (is|was|has been) (proven|established|confirmed)/g,
+            /\bdefinitely\b/g, /\bcertainly\b/g, /\bconfirmed\b/g, /\bproven\b/g]],
+  ].forEach(([w, patterns]) => {
+    patterns.forEach(p => { const m = lower.match(p); if (m) risk += m.length * w; });
   });
 
   risk = Math.max(0, Math.min(1, risk));
-
-  const level = risk >= 0.35 ? 'high' : risk >= 0.15 ? 'medium' : 'low';
-  const pct = Math.round(risk * 100);
-  return { risk, level, pct };
+  const level = risk >= 0.35 ? 'high' : risk >= 0.20 ? 'medium' : 'low';
+  return { level, pct: Math.round(risk * 100) };
 }
 
-// ── Prompt suggestions ────────────────────────────────────────────────────────
+// ── Suggestions ───────────────────────────────────────────────────────────────
 
-function generateSuggestions(originalPrompt) {
-  const p = originalPrompt.trim().replace(/\?$/, '');
+function suggestions(p) {
+  p = p.trim().replace(/\?$/, '');
   return [
-    `${p}? Please only include facts you are certain about and explicitly say "I'm not sure" for anything uncertain.`,
-    `Can you walk me through step by step: ${p.toLowerCase()}? Cite specific sources if you can, and skip anything you can't verify.`,
-    `Give me a precise, factual answer to: ${p.toLowerCase()}. Keep it concise and avoid any guessing or speculation.`,
+    `${p}? Only include facts you are certain about — say "I don't know" for anything uncertain.`,
+    `Walk me through step by step: ${p.toLowerCase()}? Cite sources where possible, skip anything you can't verify.`,
+    `Give me a precise, factual answer to: ${p.toLowerCase()}. No speculation or guessing.`,
   ];
 }
 
-// ── Badge injection ───────────────────────────────────────────────────────────
+// ── Popup ─────────────────────────────────────────────────────────────────────
 
-function injectBadge(container, scoreData, originalPrompt) {
-  if (container.querySelector('.pg-badge')) return;
+function showPopup(originalPrompt) {
+  // Only one popup at a time
+  if (document.querySelector('.pg-popup')) return;
 
-  const { level, pct } = scoreData;
+  const s = suggestions(originalPrompt);
+  const overlay = document.createElement('div');
+  overlay.className = 'pg-overlay';
+  document.body.appendChild(overlay);
 
+  const popup = document.createElement('div');
+  popup.className = 'pg-popup';
+  popup.innerHTML = s.map((t, i) => `
+    <div class="pg-suggestion">
+      <div class="pg-suggestion-num">${i + 1}</div>
+      <div class="pg-suggestion-text">${t}</div>
+      <button class="pg-use-btn" data-p="${encodeURIComponent(t)}">Use ↵</button>
+    </div>`).join('');
+  document.body.appendChild(popup);
+
+  const close = () => { popup.remove(); overlay.remove(); };
+  overlay.addEventListener('click', close);
+  popup.querySelectorAll('.pg-use-btn').forEach(btn =>
+    btn.addEventListener('click', () => { fillInput(decodeURIComponent(btn.dataset.p)); close(); }));
+}
+
+// ── Badge ─────────────────────────────────────────────────────────────────────
+
+function injectBadge(el, s, prompt, isNew) {
+  if (el.querySelector('.pg-badge')) return;
+  const { level, pct } = s;
   const badge = document.createElement('div');
   badge.className = `pg-badge pg-badge-${level}`;
   badge.innerHTML = `
@@ -125,196 +108,128 @@ function injectBadge(container, scoreData, originalPrompt) {
     <span class="pg-badge-bar"><span class="pg-badge-fill" style="width:${pct}%"></span></span>
     <span class="pg-badge-pct">${pct}%</span>
     <span class="pg-badge-level">${level.toUpperCase()}</span>
-    ${level === 'high' ? '<button class="pg-fix-btn">✦ Better prompts</button>' : ''}
+    ${level !== 'low' ? `<button class="pg-fix-btn">✦ Better prompts</button>` : ''}
   `;
+  el.appendChild(badge);
 
-  container.appendChild(badge);
-
-  if (level === 'high') {
-    badge.querySelector('.pg-fix-btn').addEventListener('click', () => {
-      showSuggestionPopup(originalPrompt, container);
-    });
-    // Auto-show popup for high risk
-    setTimeout(() => showSuggestionPopup(originalPrompt, container), 400);
+  if (level !== 'low') {
+    badge.querySelector('.pg-fix-btn').addEventListener('click', () => showPopup(prompt));
+    // Only auto-show popup for NEW responses, never for ones that existed on page load
+    if (isNew) setTimeout(() => showPopup(prompt), 500);
   }
 
-  // Save to history
-  saveToHistory({ prompt: originalPrompt, pct, level, ts: Date.now() });
-}
-
-// ── Suggestion popup ──────────────────────────────────────────────────────────
-
-function showSuggestionPopup(originalPrompt, anchor) {
-  // Remove any existing popup
-  document.querySelectorAll('.pg-popup').forEach(el => el.remove());
-
-  const suggestions = generateSuggestions(originalPrompt);
-
-  const popup = document.createElement('div');
-  popup.className = 'pg-popup';
-  popup.innerHTML = `
-    <div class="pg-popup-header">
-      <div class="pg-popup-title-row">
-        <span class="pg-popup-icon">⚠</span>
-        <div>
-          <div class="pg-popup-title">High Hallucination Risk Detected</div>
-          <div class="pg-popup-sub">This response may contain uncertain or inaccurate information</div>
-        </div>
-      </div>
-      <button class="pg-popup-close">✕</button>
-    </div>
-    <div class="pg-popup-divider"></div>
-    <div class="pg-popup-body">
-      <div class="pg-popup-hint">✦ Try one of these clearer prompts:</div>
-      ${suggestions.map((s, i) => `
-        <div class="pg-suggestion" data-index="${i}">
-          <div class="pg-suggestion-num">${i + 1}</div>
-          <div class="pg-suggestion-text">${s}</div>
-          <button class="pg-use-btn" data-prompt="${encodeURIComponent(s)}">Use this ↵</button>
-        </div>
-      `).join('')}
-    </div>
-    <div class="pg-popup-footer">PromptGuard · Click "Use this" to auto-fill the chatbox</div>
-  `;
-
-  document.body.appendChild(popup);
-
-  // Position near the anchor
-  const rect = anchor.getBoundingClientRect();
-  const top = Math.min(rect.bottom + window.scrollY + 12, window.scrollY + window.innerHeight - 420);
-  popup.style.top = `${top}px`;
-
-  // Close button
-  popup.querySelector('.pg-popup-close').addEventListener('click', () => popup.remove());
-
-  // Use this buttons
-  popup.querySelectorAll('.pg-use-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const prompt = decodeURIComponent(btn.dataset.prompt);
-      fillInput(prompt);
-      popup.remove();
-    });
+  chrome.storage.local.get(['pg_history','pg_stats'], data => {
+    const h = data.pg_history || [];
+    h.unshift({ prompt, pct, level, ts: Date.now() });
+    if (h.length > 100) h.splice(100);
+    const st = data.pg_stats || { total:0, high:0, totalRisk:0 };
+    st.total++; if (level === 'high') st.high++; st.totalRisk += pct;
+    chrome.storage.local.set({ pg_history: h, pg_stats: st });
   });
 }
 
-// ── Fill input on target platform ─────────────────────────────────────────────
+// ── Text helpers ──────────────────────────────────────────────────────────────
+
+function getText(el) {
+  const textSel = SELECTORS[PLATFORM].text;
+  const inner = el.querySelector(textSel);
+  const t = (inner || el).innerText?.trim() || '';
+  return t;
+}
+
+function getPrompt(el) {
+  let cur = el;
+  while (cur) {
+    cur = cur.previousElementSibling;
+    if (!cur) break;
+    if (cur.getAttribute('data-message-author-role') === 'user') return cur.innerText?.trim() || '';
+    if (cur.classList.contains('human-turn')) return cur.innerText?.trim() || '';
+  }
+  const all = document.querySelectorAll('[data-message-author-role="user"]');
+  return all.length ? all[all.length-1].innerText?.trim() || '' : 'this topic';
+}
 
 function fillInput(text) {
-  const sel = SELECTORS[PLATFORM]?.input;
-  if (!sel) return;
-
-  const el = document.querySelector(sel);
+  const el = document.querySelector(SELECTORS[PLATFORM].input);
   if (!el) return;
-
   el.focus();
-
   if (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') {
-    const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set
-      || Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
-    if (nativeSetter) nativeSetter.call(el, text);
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
+    if (setter) setter.call(el, text);
     el.dispatchEvent(new Event('input', { bubbles: true }));
-    el.dispatchEvent(new Event('change', { bubbles: true }));
   } else if (el.isContentEditable) {
     el.innerText = text;
     el.dispatchEvent(new InputEvent('input', { bubbles: true }));
   }
 }
 
-// ── Extract text from response ────────────────────────────────────────────────
+// ── Process a response element ────────────────────────────────────────────────
 
-function extractText(container) {
-  const sel = SELECTORS[PLATFORM]?.text;
-  const inner = sel ? container.querySelector(sel) : null;
-  return (inner || container).innerText?.trim() || '';
-}
+function processEl(el) {
+  if (el.dataset.pgDone) return;
+  // Don't start a second poll if one is already running for this element
+  if (el.dataset.pgPolling === '1') return;
+  el.dataset.pgPolling = '1';
+  const isNew = !el.dataset.pgOld;
 
-function extractUserPrompt(responseEl) {
-  // Walk backwards through siblings/cousins to find the preceding user message
-  let el = responseEl;
-  while (el) {
-    el = el.previousElementSibling;
-    if (!el) break;
-    const role = el.getAttribute('data-message-author-role');
-    if (role === 'user') {
-      return el.innerText?.trim() || '';
-    }
-    // Claude / Gemini: look for human-turn markers
-    if (el.classList.contains('human-turn') || el.querySelector('[data-testid="human-turn"]')) {
-      return el.innerText?.trim() || '';
-    }
-  }
-  return '';
-}
+  let last = '', stable = 0;
 
-// ── Storage helpers ───────────────────────────────────────────────────────────
+  function poll() {
+    // Element may have been removed from DOM
+    if (!document.contains(el)) return;
+    if (el.dataset.pgDone) return;
 
-function saveToHistory(entry) {
-  chrome.storage.local.get(['pg_history', 'pg_stats'], data => {
-    const history = data.pg_history || [];
-    history.unshift(entry);
-    if (history.length > 100) history.splice(100);
+    const text = el.innerText?.trim() || '';
+    if (!text || text.length < 30) { setTimeout(poll, 500); return; }
 
-    const stats = data.pg_stats || { total: 0, high: 0, totalRisk: 0 };
-    stats.total += 1;
-    if (entry.level === 'high') stats.high += 1;
-    stats.totalRisk += entry.pct;
-
-    chrome.storage.local.set({ pg_history: history, pg_stats: stats });
-  });
-}
-
-// ── Observer ──────────────────────────────────────────────────────────────────
-
-function processResponse(el) {
-  if (processed.has(el)) return;
-
-  const text = extractText(el);
-  if (!text || text.length < 40) return;
-
-  // Wait a beat to make sure streaming is done
-  const waitForDone = () => {
-    const currentText = extractText(el);
-    setTimeout(() => {
-      const laterText = extractText(el);
-      if (laterText !== currentText) {
-        // Still streaming — check again
-        setTimeout(waitForDone, 800);
+    if (text === last) {
+      stable++;
+      if (stable >= 2) {
+        el.dataset.pgDone = '1';
+        el.dataset.pgPolling = '0';
+        injectBadge(el, score(text), getPrompt(el), isNew);
         return;
       }
-      // Text settled — score and inject
-      if (processed.has(el)) return;
-      processed.add(el);
+    } else {
+      stable = 0;
+      last = text;
+    }
+    setTimeout(poll, 600);
+  }
 
-      const score = scoreHallucination(laterText);
-      const prompt = extractUserPrompt(el) || 'your question';
-      injectBadge(el, score, prompt);
-    }, 800);
-  };
-
-  waitForDone();
+  setTimeout(poll, 300);
 }
 
-function observe() {
-  if (!PLATFORM) return;
+// ── Observe ───────────────────────────────────────────────────────────────────
 
-  const sel = SELECTORS[PLATFORM].response;
-
-  // Process any already-existing responses
-  document.querySelectorAll(sel).forEach(processResponse);
-
-  const observer = new MutationObserver(mutations => {
-    for (const mut of mutations) {
-      for (const node of mut.addedNodes) {
-        if (!(node instanceof Element)) continue;
-        if (node.matches(sel)) {
-          processResponse(node);
-        }
-        node.querySelectorAll(sel).forEach(processResponse);
+function scan() {
+  document.querySelectorAll(sel).forEach(el => {
+    // Reset stale polling state if element has text but polling got stuck
+    if (el.dataset.pgPolling === '1' && !el.dataset.pgDone) {
+      const text = el.innerText?.trim() || '';
+      if (text.length > 30 && !el.querySelector('.pg-badge')) {
+        el.dataset.pgPolling = '0'; // allow re-entry
       }
     }
+    processEl(el);
   });
-
-  observer.observe(document.body, { childList: true, subtree: true });
 }
 
-observe();
+new MutationObserver(scan).observe(document.body, { childList: true, subtree: true });
+setInterval(scan, 1500);
+
+// SPA navigation detection
+let lastUrl = location.href;
+setInterval(() => {
+  if (location.href === lastUrl) return;
+  lastUrl = location.href;
+  // Mark any currently visible responses as old
+  setTimeout(() => {
+    document.querySelectorAll(sel).forEach(el => {
+      if (el.dataset.pgDone) el.dataset.pgOld = '1';
+    });
+    scan();
+  }, 800);
+}, 500);
+
+} // end setup()
