@@ -178,6 +178,82 @@ if _DASHBOARD_DIR.exists():
                 count=1,
                 flags=_re.DOTALL,
             )
+
+        # Render metric bars (pure HTML — no Chart.js needed)
+        _META = {
+            "hallucination": (
+                "Hallucination guard",
+                "linear-gradient(90deg,#60a5fa,#3b82f6)",
+            ),
+            "coherence": ("Coherence", "linear-gradient(90deg,#2dd4bf,#0891b2)"),
+            "conciseness": ("Conciseness", "linear-gradient(90deg,#a78bfa,#7c3aed)"),
+            "latency": ("Latency score", "linear-gradient(90deg,#34d399,#059669)"),
+            "faithfulness": ("Faithfulness", "linear-gradient(90deg,#4ade80,#22c55e)"),
+            "relevance": ("Relevance", "linear-gradient(90deg,#facc15,#eab308)"),
+            "toxicity": ("Toxicity guard", "linear-gradient(90deg,#fb923c,#f97316)"),
+        }
+        _ORDER = [
+            "faithfulness",
+            "relevance",
+            "hallucination",
+            "coherence",
+            "toxicity",
+            "conciseness",
+            "latency",
+        ]
+        _FALLBACK_FILL = "rgba(255,255,255,.4)"
+        if metrics_agg:
+            bar_rows = "".join(
+                f'<div class="bar-row">'
+                f'<div class="bar-info"><div class="bar-top">'
+                f'<span class="bar-name">{_META.get(k, (k, _FALLBACK_FILL))[0]}</span>'
+                f'<span style="color:#fff;font-weight:500">{round(metrics_agg[k]*100)}%</span>'
+                f'</div><div class="track"><div class="fill" style="width:{round(metrics_agg[k]*100)}%;'
+                f'background:{_META.get(k, (k, _FALLBACK_FILL))[1]}"></div>'
+                f"</div></div></div>"
+                for k in _ORDER
+                if k in metrics_agg
+            )
+            html = _re.sub(
+                r'id="metric-bars">.*?</div>',
+                f'id="metric-bars">{bar_rows}</div>',
+                html,
+                count=1,
+                flags=_re.DOTALL,
+            )
+            html = html.replace(
+                'id="m-sample">loading…<', f'id="m-sample">{len(evals)} evals<', 1
+            )
+
+        # Render overall score donut as SVG (no Chart.js needed)
+        if overall_scores:
+            overall_pct = round(avg_overall * 100)
+            r_val, cx, cy = 54, 60, 60
+            circ = 2 * 3.14159 * r_val
+            filled = circ * overall_pct / 100
+            donut_svg = (
+                f'<svg width="120" height="120" viewBox="0 0 120 120" style="transform:rotate(-90deg)">'
+                f'<circle cx="{cx}" cy="{cy}" r="{r_val}" fill="none" stroke="#1e3a5f" stroke-width="12"/>'
+                f'<circle cx="{cx}" cy="{cy}" r="{r_val}" fill="none" stroke="#facc15" stroke-width="12"'
+                f' stroke-dasharray="{filled:.1f} {circ:.1f}" stroke-linecap="round"/>'
+                f"</svg>"
+            )
+            html = html.replace(
+                '<canvas id="donutChart" width="120" height="120"></canvas>',
+                donut_svg,
+                1,
+            )
+            html = html.replace(
+                'id="donut-num">—%<br>',
+                f'id="donut-num">{overall_pct}%<br>',
+                1,
+            )
+            html = html.replace(
+                'id="donut-sub">loading…<',
+                f'id="donut-sub">{_total_count:,} evals<',
+                1,
+            )
+
         return HTMLResponse(content=html, headers={"Cache-Control": "no-store"})
 
 
