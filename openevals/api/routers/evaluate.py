@@ -13,7 +13,8 @@ router = APIRouter()
 
 # ── In-memory stores ──────────────────────────────────────────────────────────
 _jobs: dict[str, dict] = {}
-_recent_evals: deque = deque(maxlen=200)   # last 200 completed evaluations
+_recent_evals: deque = deque(maxlen=500)
+_history: list = []          # time-series snapshots for trend chart
 _error_count: int = 0
 _total_count: int = 0
 
@@ -27,6 +28,7 @@ def _store_result(request: EvaluationRequest, result_dict: dict, latency_ms: flo
     _total_count += 1
     scores = {r["metric_name"]: r["score"] for r in result_dict.get("metric_results", [])}
     overall = round(sum(scores.values()) / len(scores), 4) if scores else 0.0
+    ts = datetime.now(timezone.utc).isoformat()
     _recent_evals.appendleft({
         "id": str(result_dict.get("request_id", uuid.uuid4())),
         "prompt": request.prompt[:120],
@@ -35,7 +37,14 @@ def _store_result(request: EvaluationRequest, result_dict: dict, latency_ms: flo
         "scores": scores,
         "overall_score": overall,
         "latency_ms": round(latency_ms, 1),
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": ts,
+    })
+    # Record history snapshot every eval (for trend chart)
+    _history.append({
+        "t": _total_count,
+        "ts": ts,
+        "overall": overall,
+        **{f"score_{k}": v for k, v in scores.items()},
     })
 
 
@@ -91,7 +100,7 @@ async def evaluate_sync(
 
 @router.get("/recent")
 async def recent_evaluations(limit: int = Query(20, ge=1, le=100)):
-    """Return the most recent evaluations (no auth required for dashboard)."""
+    """Return the most recent evaluations."""
     return {"evaluations": list(_recent_evals)[:limit], "total": _total_count}
 
 
@@ -126,6 +135,17 @@ async def metrics_aggregate():
             totals.setdefault(metric, []).append(score)
     aggregated = {m: round(sum(v) / len(v), 4) for m, v in totals.items()}
     return {"metrics": aggregated, "sample_size": len(evals)}
+
+
+@router.get("/history")
+async def history(limit: int = Query(100, ge=1, le=500)):
+    """Time-series history of evaluation scores for trend charts."""
+    h = _history[-limit:]
+    # Downsample if too many points (keep every Nth)
+    if len(h) > 50:
+        step = max(1, len(h) // 50)
+        h = h[::step]
+    return {"history": h, "total_points": len(_history)}
 
 
 # ── Background task ───────────────────────────────────────────────────────────
