@@ -1,43 +1,31 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import List
-from groq import Groq
 import os
+import json
+import re
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+from groq import Groq
 
-app = FastAPI(title="OpenEvals API")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["POST"],
-    allow_headers=["*"],
-)
+app = Flask(__name__)
+CORS(app)
 
 client = Groq(api_key=os.environ["GROQ_API_KEY"])
 
-class SuggestRequest(BaseModel):
-    prompt: str
-    response: str
-
-class SuggestResponse(BaseModel):
-    suggestions: List[str]
-    model: str = "llama-3.1-8b-instant"
-
-@app.post("/suggest", response_model=SuggestResponse)
-async def suggest(body: SuggestRequest):
-    if not body.prompt.strip():
-        raise HTTPException(status_code=400, detail="prompt is required")
+@app.post("/suggest")
+def suggest():
+    body = request.get_json(force=True)
+    prompt = (body.get("prompt") or "").strip()
+    response = (body.get("response") or "").strip()
+    if not prompt:
+        return jsonify({"error": "prompt is required"}), 400
 
     system = (
         "You are an expert at identifying vague or uncertain AI responses and rewriting "
         "user questions to get more accurate, factual answers. "
         "Always return exactly a JSON array of 3 strings and nothing else."
     )
-
     user = (
-        f'The user asked: "{body.prompt}"\n\n'
-        f'The AI responded with signs of uncertainty:\n"{body.response[:800]}"\n\n'
+        f'The user asked: "{prompt}"\n\n'
+        f'The AI responded with signs of uncertainty:\n"{response[:800]}"\n\n'
         "Write 3 improved versions of the user's question that will produce a more "
         "accurate, confident, factual answer. Each version must use a different strategy:\n"
         "1. Ask the AI to flag anything it is uncertain about\n"
@@ -50,26 +38,28 @@ async def suggest(body: SuggestRequest):
         model="llama-3.1-8b-instant",
         messages=[
             {"role": "system", "content": system},
-            {"role": "user",   "content": user},
+            {"role": "user", "content": user},
         ],
         max_tokens=400,
         temperature=0.4,
     )
 
     raw = completion.choices[0].message.content.strip()
-
-    import json, re
     match = re.search(r'\[.*\]', raw, re.DOTALL)
     if not match:
-        raise HTTPException(status_code=502, detail="Model returned unexpected format")
+        return jsonify({"error": "model returned unexpected format"}), 502
 
     suggestions = json.loads(match.group())
     if not isinstance(suggestions, list) or len(suggestions) < 3:
-        raise HTTPException(status_code=502, detail="Model returned fewer than 3 suggestions")
+        return jsonify({"error": "model returned fewer than 3 suggestions"}), 502
 
-    return SuggestResponse(suggestions=suggestions[:3])
+    return jsonify({"suggestions": suggestions[:3], "model": "llama-3.1-8b-instant"})
 
 
 @app.get("/health")
-async def health():
-    return {"status": "ok"}
+def health():
+    return jsonify({"status": "ok"})
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))
