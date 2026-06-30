@@ -101,7 +101,7 @@ function scoreHallucination(text) {
   return { level, pct: Math.round(risk * 100), triggers: uniqueTriggers };
 }
 
-// ── AI suggestions via Groq (falls back to templates) ────────────────────────
+const API_URL = 'https://openevals-api.onrender.com';
 
 function templateSuggestions(p) {
   p = p.trim().replace(/\?$/, '');
@@ -113,39 +113,21 @@ function templateSuggestions(p) {
 }
 
 async function getSuggestions(originalPrompt, responseText) {
-  return new Promise(resolve => {
-    chrome.storage.local.get('groq_key', async ({ groq_key }) => {
-      if (!groq_key) { resolve(templateSuggestions(originalPrompt)); return; }
-
-      try {
-        const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${groq_key}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: 'llama-3.1-8b-instant',
-            messages: [{
-              role: 'user',
-              content: `A user asked an AI: "${originalPrompt}"\n\nThe AI response contained signs of uncertainty. Write exactly 3 improved versions of the user's question that will get a more accurate, confident, factual answer. Each version should use a different strategy (e.g. ask for sources, ask to flag uncertainty, ask for step-by-step). Return only a valid JSON array of 3 strings. No explanation, no markdown, just the array.`
-            }],
-            max_tokens: 400,
-            temperature: 0.4,
-          })
-        });
-
-        if (!res.ok) throw new Error('API error');
-        const data = await res.json();
-        const raw = data.choices?.[0]?.message?.content?.trim();
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length === 3) {
-          resolve(parsed);
-        } else {
-          resolve(templateSuggestions(originalPrompt));
-        }
-      } catch {
-        resolve(templateSuggestions(originalPrompt));
-      }
+  try {
+    const res = await fetch(`${API_URL}/suggest`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: originalPrompt, response: responseText }),
     });
-  });
+    if (!res.ok) throw new Error('API error');
+    const data = await res.json();
+    if (Array.isArray(data.suggestions) && data.suggestions.length === 3) {
+      return data.suggestions;
+    }
+    throw new Error('Bad response');
+  } catch {
+    return templateSuggestions(originalPrompt);
+  }
 }
 
 // ── Popup ─────────────────────────────────────────────────────────────────────

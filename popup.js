@@ -30,6 +30,3 @@ document.getElementById('history-toggle').addEventListener('click', () => {
     h.classList.contains('hidden') ? 'View recent activity ›' : 'Hide recent activity ›';
 });
 
-document.getElementById('open-settings').addEventListener('click', () => {
-  chrome.runtime.openOptionsPage();
-});
