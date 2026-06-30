@@ -1,18 +1,23 @@
 from __future__ import annotations
+
 import asyncio
 import json
 import re
 from functools import lru_cache
 from typing import List
+
+from openevals.config import settings
 from openevals.metrics.base import BaseMetric
 from openevals.types import EvaluationRequest, MetricResult
-from openevals.config import settings
 
 
 @lru_cache(maxsize=1)
 def _get_nli():
     from transformers import pipeline
-    return pipeline("text-classification", model="cross-encoder/nli-deberta-v3-small", device=-1)
+
+    return pipeline(
+        "text-classification", model="cross-encoder/nli-deberta-v3-small", device=-1
+    )
 
 
 CLAIM_PROMPT = """Extract ALL atomic factual claims from this text as a JSON array.
@@ -30,11 +35,13 @@ class FaithfulnessMetric(BaseMetric):
         self.validate_input(request)
         claims = await self._extract_claims(request.response)
         if not claims:
-            return self._make_result(score=1.0, explanation="No verifiable claims found")
+            return self._make_result(
+                score=1.0, explanation="No verifiable claims found"
+            )
 
-        scores = await asyncio.gather(*[
-            self._check_entailment(c, request.context or "") for c in claims
-        ])
+        scores = await asyncio.gather(
+            *[self._check_entailment(c, request.context or "") for c in claims]
+        )
         score = float(sum(scores) / len(scores))
         entailed = sum(1 for s in scores if s > 0.5)
         return self._make_result(
@@ -46,10 +53,16 @@ class FaithfulnessMetric(BaseMetric):
         if settings.openai_api_key:
             try:
                 import openai
+
                 client = openai.AsyncOpenAI(api_key=settings.openai_api_key)
                 resp = await client.chat.completions.create(
                     model="gpt-4o-mini",
-                    messages=[{"role": "user", "content": CLAIM_PROMPT.format(text=text[:2000])}],
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": CLAIM_PROMPT.format(text=text[:2000]),
+                        }
+                    ],
                     temperature=0.0,
                     max_tokens=500,
                 )

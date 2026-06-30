@@ -1,4 +1,5 @@
 from typing import Dict, List
+
 import numpy as np
 from scipy import stats
 
@@ -23,7 +24,9 @@ def detect_distributional_shift(
         "ks_statistic": float(ks_stat),
         "p_value": float(p_value),
         "psi": psi_score,
-        "severity": "none" if psi_score < 0.1 else "minor" if psi_score < 0.2 else "major",
+        "severity": (
+            "none" if psi_score < 0.1 else "minor" if psi_score < 0.2 else "major"
+        ),
         "reference_mean": float(np.mean(ref)),
         "current_mean": float(np.mean(cur)),
         "mean_shift": float(np.mean(cur) - np.mean(ref)),

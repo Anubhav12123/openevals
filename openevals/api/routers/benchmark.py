@@ -1,8 +1,11 @@
 from __future__ import annotations
+
 import uuid
-from typing import List, Optional
+from typing import List
+
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
+
 from openevals.api.middleware.auth import require_api_key
 
 router = APIRouter()
@@ -53,12 +56,14 @@ async def _run_benchmark(benchmark_id: uuid.UUID, request: BenchmarkRequest) -> 
     _benchmarks[str(benchmark_id)]["status"] = "running"
     try:
         # Stub: in production, load dataset, call each model, evaluate
-        _benchmarks[str(benchmark_id)].update({
-            "status": "completed",
-            "results": {
-                model: {metric: 0.85 for metric in request.metrics}
-                for model in request.models
-            },
-        })
+        _benchmarks[str(benchmark_id)].update(
+            {
+                "status": "completed",
+                "results": {
+                    model: {metric: 0.85 for metric in request.metrics}
+                    for model in request.models
+                },
+            }
+        )
     except Exception as e:
         _benchmarks[str(benchmark_id)].update({"status": "failed", "error": str(e)})

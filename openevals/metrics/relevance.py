@@ -1,7 +1,10 @@
 from __future__ import annotations
+
 import asyncio
 from functools import lru_cache
+
 import numpy as np
+
 from openevals.metrics.base import BaseMetric
 from openevals.types import EvaluationRequest, MetricResult
 
@@ -9,12 +12,15 @@ from openevals.types import EvaluationRequest, MetricResult
 @lru_cache(maxsize=1)
 def _get_sbert():
     from sentence_transformers import SentenceTransformer
+
     return SentenceTransformer("all-MiniLM-L6-v2")
 
 
 class RelevanceMetric(BaseMetric):
     name = "relevance"
-    description = "Hybrid relevance: dense cosine similarity (70%) + BM25 sparse retrieval (30%)"
+    description = (
+        "Hybrid relevance: dense cosine similarity (70%) + BM25 sparse retrieval (30%)"
+    )
 
     DENSE_WEIGHT = 0.7
     SPARSE_WEIGHT = 0.3
@@ -38,6 +44,7 @@ class RelevanceMetric(BaseMetric):
 
         try:
             from rank_bm25 import BM25Okapi
+
             prompt_tokens = prompt.lower().split()
             response_tokens = response.lower().split()
             if prompt_tokens and response_tokens:

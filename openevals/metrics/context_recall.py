@@ -1,8 +1,10 @@
 from __future__ import annotations
+
 import json
+
+from openevals.config import settings
 from openevals.metrics.base import BaseMetric
 from openevals.types import EvaluationRequest, MetricResult
-from openevals.config import settings
 
 PROMPT = """Measure CONTEXT RECALL: what fraction of information needed to answer the question is in the context.
 Question: {prompt}
@@ -13,7 +15,9 @@ Return JSON: {{"score": <float 0.0-1.0>, "explanation": "<brief>", "missing": ["
 
 class ContextRecallMetric(BaseMetric):
     name = "context_recall"
-    description = "RAGAS context recall: fraction of needed information present in context"
+    description = (
+        "RAGAS context recall: fraction of needed information present in context"
+    )
     requires_context = True
 
     async def compute(self, request: EvaluationRequest) -> MetricResult:
@@ -21,14 +25,20 @@ class ContextRecallMetric(BaseMetric):
         if settings.openai_api_key:
             try:
                 import openai
+
                 client = openai.AsyncOpenAI(api_key=settings.openai_api_key)
                 resp = await client.chat.completions.create(
                     model="gpt-4o-mini",
-                    messages=[{"role": "user", "content": PROMPT.format(
-                        prompt=request.prompt[:500],
-                        response=request.response[:500],
-                        context=(request.context or "")[:1000],
-                    )}],
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": PROMPT.format(
+                                prompt=request.prompt[:500],
+                                response=request.response[:500],
+                                context=(request.context or "")[:1000],
+                            ),
+                        }
+                    ],
                     response_format={"type": "json_object"},
                     temperature=0.0,
                 )
@@ -46,4 +56,7 @@ class ContextRecallMetric(BaseMetric):
         if not resp_words:
             return self._make_result(score=0.0, explanation="Empty response")
         overlap = len(ctx_words & resp_words) / len(resp_words)
-        return self._make_result(score=min(1.0, overlap * 2), explanation=f"Word overlap recall: {overlap:.3f}")
+        return self._make_result(
+            score=min(1.0, overlap * 2),
+            explanation=f"Word overlap recall: {overlap:.3f}",
+        )

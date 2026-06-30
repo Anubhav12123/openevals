@@ -1,4 +1,5 @@
 import pytest
+
 from openevals.metrics.conciseness import ConcisenessMetric
 from openevals.types import EvaluationRequest
 

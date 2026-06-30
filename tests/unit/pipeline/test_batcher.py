@@ -1,4 +1,3 @@
-import pytest
 from openevals.pipeline.batcher import Batcher
 from openevals.types import EvaluationRequest
 

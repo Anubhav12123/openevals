@@ -1,15 +1,19 @@
 """Bulk evaluation endpoint with real-time SSE streaming progress."""
+
 from __future__ import annotations
+
 import asyncio
 import json
 import time
 from typing import List, Optional
+
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from openevals.types import EvaluationRequest
+
+from openevals.api.routers.evaluate import DEFAULT_METRICS, _store_result
 from openevals.core import Evaluator
-from openevals.api.routers.evaluate import _store_result, DEFAULT_METRICS
+from openevals.types import EvaluationRequest
 
 router = APIRouter()
 
@@ -61,18 +65,24 @@ async def bulk_evaluate_stream(body: BulkRequest):
                 result_dict = result.model_dump(mode="json")
                 _store_result(req, result_dict, latency_ms)
 
-                scores = {r["metric_name"]: r["score"] for r in result_dict["metric_results"]}
+                scores = {
+                    r["metric_name"]: r["score"] for r in result_dict["metric_results"]
+                }
                 for m, s in scores.items():
                     metric_totals.setdefault(m, []).append(s)
 
-                overall = round(sum(scores.values()) / len(scores), 4) if scores else 0.0
-                results.append({
-                    "prompt": item.prompt[:80],
-                    "model_name": item.model_name,
-                    "scores": scores,
-                    "overall_score": overall,
-                    "latency_ms": round(latency_ms, 1),
-                })
+                overall = (
+                    round(sum(scores.values()) / len(scores), 4) if scores else 0.0
+                )
+                results.append(
+                    {
+                        "prompt": item.prompt[:80],
+                        "model_name": item.model_name,
+                        "scores": scores,
+                        "overall_score": overall,
+                        "latency_ms": round(latency_ms, 1),
+                    }
+                )
 
                 event = {
                     "type": "progress",
@@ -140,18 +150,24 @@ async def bulk_evaluate(body: BulkRequest):
         _store_result(req, rd, latency_ms)
         return rd
 
-    all_results = await asyncio.gather(*[eval_one(i) for i in body.items], return_exceptions=True)
+    all_results = await asyncio.gather(
+        *[eval_one(i) for i in body.items], return_exceptions=True
+    )
     for rd in all_results:
         if isinstance(rd, Exception):
             continue
         scores = {r["metric_name"]: r["score"] for r in rd["metric_results"]}
         for m, s in scores.items():
             metric_totals.setdefault(m, []).append(s)
-        results.append({
-            "prompt": rd["request"]["prompt"][:80],
-            "scores": scores,
-            "overall_score": round(sum(scores.values()) / len(scores), 4) if scores else 0.0,
-        })
+        results.append(
+            {
+                "prompt": rd["request"]["prompt"][:80],
+                "scores": scores,
+                "overall_score": (
+                    round(sum(scores.values()) / len(scores), 4) if scores else 0.0
+                ),
+            }
+        )
 
     aggregate = {m: round(sum(v) / len(v), 4) for m, v in metric_totals.items()}
     return {"results": results, "aggregate": aggregate, "total": len(results)}

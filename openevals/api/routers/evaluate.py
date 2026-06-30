@@ -1,20 +1,23 @@
 from __future__ import annotations
-import uuid
+
 import time
+import uuid
 from collections import deque
 from datetime import datetime, timezone
 from typing import List, Optional
+
 from fastapi import APIRouter, BackgroundTasks, Depends, Query
-from openevals.types import EvaluationRequest, EvaluationJobResponse
+
 from openevals.api.middleware.auth import require_api_key
 from openevals.core import Evaluator
+from openevals.types import EvaluationJobResponse, EvaluationRequest
 
 router = APIRouter()
 
 # ── In-memory stores ──────────────────────────────────────────────────────────
 _jobs: dict[str, dict] = {}
 _recent_evals: deque = deque(maxlen=500)
-_history: list = []          # time-series snapshots for trend chart
+_history: list = []  # time-series snapshots for trend chart
 _error_count: int = 0
 _total_count: int = 0
 
@@ -23,29 +26,38 @@ DEFAULT_METRICS = ["hallucination", "coherence", "conciseness", "latency"]
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _store_result(request: EvaluationRequest, result_dict: dict, latency_ms: float) -> None:
+
+def _store_result(
+    request: EvaluationRequest, result_dict: dict, latency_ms: float
+) -> None:
     global _total_count
     _total_count += 1
-    scores = {r["metric_name"]: r["score"] for r in result_dict.get("metric_results", [])}
+    scores = {
+        r["metric_name"]: r["score"] for r in result_dict.get("metric_results", [])
+    }
     overall = round(sum(scores.values()) / len(scores), 4) if scores else 0.0
     ts = datetime.now(timezone.utc).isoformat()
-    _recent_evals.appendleft({
-        "id": str(result_dict.get("request_id", uuid.uuid4())),
-        "prompt": request.prompt[:120],
-        "response": request.response[:200],
-        "model_name": request.model_name,
-        "scores": scores,
-        "overall_score": overall,
-        "latency_ms": round(latency_ms, 1),
-        "created_at": ts,
-    })
+    _recent_evals.appendleft(
+        {
+            "id": str(result_dict.get("request_id", uuid.uuid4())),
+            "prompt": request.prompt[:120],
+            "response": request.response[:200],
+            "model_name": request.model_name,
+            "scores": scores,
+            "overall_score": overall,
+            "latency_ms": round(latency_ms, 1),
+            "created_at": ts,
+        }
+    )
     # Record history snapshot every eval (for trend chart)
-    _history.append({
-        "t": _total_count,
-        "ts": ts,
-        "overall": overall,
-        **{f"score_{k}": v for k, v in scores.items()},
-    })
+    _history.append(
+        {
+            "t": _total_count,
+            "ts": ts,
+            "overall": overall,
+            **{f"score_{k}": v for k, v in scores.items()},
+        }
+    )
 
 
 def _record_error() -> None:
@@ -56,6 +68,7 @@ def _record_error() -> None:
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 
+
 @router.post("/evaluate", response_model=EvaluationJobResponse)
 async def submit_evaluation(
     request: EvaluationRequest,
@@ -64,7 +77,9 @@ async def submit_evaluation(
     _auth: dict = Depends(require_api_key),
 ):
     """Submit prompt-response pair(s) for async evaluation."""
-    metric_list = [m.strip() for m in metrics.split(",")] if metrics else DEFAULT_METRICS
+    metric_list = (
+        [m.strip() for m in metrics.split(",")] if metrics else DEFAULT_METRICS
+    )
     job_id = uuid.uuid4()
     _jobs[str(job_id)] = {"status": "queued", "result": None, "error": None}
     background_tasks.add_task(_run_evaluation, job_id, request, metric_list)
@@ -77,6 +92,7 @@ async def get_results(job_id: uuid.UUID, _auth: dict = Depends(require_api_key))
     job = _jobs.get(str(job_id))
     if not job:
         from fastapi import HTTPException
+
         raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
     return job
 
@@ -88,7 +104,9 @@ async def evaluate_sync(
     _auth: dict = Depends(require_api_key),
 ):
     """Synchronous evaluation — waits for result."""
-    metric_list = [m.strip() for m in metrics.split(",")] if metrics else DEFAULT_METRICS
+    metric_list = (
+        [m.strip() for m in metrics.split(",")] if metrics else DEFAULT_METRICS
+    )
     t0 = time.perf_counter()
     evaluator = Evaluator(metrics=metric_list)
     result = await evaluator.evaluate_request(request)
@@ -103,6 +121,7 @@ async def recent_evaluations(limit: int = Query(20, ge=1, le=100)):
     """Return the most recent evaluations."""
     return {"evaluations": list(_recent_evals)[:limit], "total": _total_count}
 
+
 # Alias kept for backwards compatibility
 @router.get("/recent", include_in_schema=False)
 async def recent_alias(limit: int = Query(20, ge=1, le=100)):
@@ -115,10 +134,14 @@ async def stats():
     evals = list(_recent_evals)
     total = _total_count
     errors = _error_count
-    avg_latency = round(sum(e["latency_ms"] for e in evals) / len(evals), 1) if evals else 0.0
+    avg_latency = (
+        round(sum(e["latency_ms"] for e in evals) / len(evals), 1) if evals else 0.0
+    )
     error_rate = round((errors / total * 100), 3) if total > 0 else 0.0
     overall_scores = [e["overall_score"] for e in evals if e["overall_score"] > 0]
-    avg_overall = round(sum(overall_scores) / len(overall_scores), 4) if overall_scores else 0.0
+    avg_overall = (
+        round(sum(overall_scores) / len(overall_scores), 4) if overall_scores else 0.0
+    )
     return {
         "total_evaluations": total,
         "avg_latency_ms": avg_latency,
@@ -155,6 +178,7 @@ async def history(limit: int = Query(100, ge=1, le=500)):
 
 # ── Background task ───────────────────────────────────────────────────────────
 
+
 async def _run_evaluation(
     job_id: uuid.UUID, request: EvaluationRequest, metrics: List[str]
 ) -> None:
@@ -166,7 +190,11 @@ async def _run_evaluation(
         result.job_id = job_id
         result_dict = result.model_dump(mode="json")
         latency_ms = (time.perf_counter() - t0) * 1000
-        _jobs[str(job_id)] = {"status": "completed", "result": result_dict, "error": None}
+        _jobs[str(job_id)] = {
+            "status": "completed",
+            "result": result_dict,
+            "error": None,
+        }
         _store_result(request, result_dict, latency_ms)
     except Exception as e:
         _record_error()

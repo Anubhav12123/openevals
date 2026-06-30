@@ -1,9 +1,11 @@
 from __future__ import annotations
+
 import asyncio
 import json
+
+from openevals.config import settings
 from openevals.metrics.base import BaseMetric
 from openevals.types import EvaluationRequest, MetricResult
-from openevals.config import settings
 
 HALLUCINATION_PROMPT = """You are a fact-checker. Identify hallucinated claims in the response.
 
@@ -32,16 +34,22 @@ class HallucinationMetric(BaseMetric):
 
     async def _llm_check(self, request: EvaluationRequest) -> MetricResult:
         import openai
+
         ctx = f"Context: {request.context}" if request.context else ""
         try:
             client = openai.AsyncOpenAI(api_key=settings.openai_api_key)
             resp = await client.chat.completions.create(
                 model="gpt-4o-mini",
-                messages=[{"role": "user", "content": HALLUCINATION_PROMPT.format(
-                    prompt=request.prompt[:1000],
-                    response=request.response[:1000],
-                    ctx=ctx,
-                )}],
+                messages=[
+                    {
+                        "role": "user",
+                        "content": HALLUCINATION_PROMPT.format(
+                            prompt=request.prompt[:1000],
+                            response=request.response[:1000],
+                            ctx=ctx,
+                        ),
+                    }
+                ],
                 response_format={"type": "json_object"},
                 temperature=0.0,
             )
@@ -56,17 +64,21 @@ class HallucinationMetric(BaseMetric):
         except Exception as e:
             return await self._entity_overlap(request, error=str(e))
 
-    async def _entity_overlap(self, request: EvaluationRequest, error: str = "") -> MetricResult:
+    async def _entity_overlap(
+        self, request: EvaluationRequest, error: str = ""
+    ) -> MetricResult:
         loop = asyncio.get_event_loop()
         score = await loop.run_in_executor(None, self._entity_sync, request)
         return self._make_result(
             score=score,
-            explanation=f"Entity overlap score: {score:.3f}" + (f" [fallback: {error}]" if error else ""),
+            explanation=f"Entity overlap score: {score:.3f}"
+            + (f" [fallback: {error}]" if error else ""),
         )
 
     def _entity_sync(self, request: EvaluationRequest) -> float:
         try:
             import spacy
+
             nlp = spacy.load("en_core_web_sm")
             source = (request.prompt + " " + (request.context or ""))[:1000]
             source_ents = {e.text.lower() for e in nlp(source).ents}

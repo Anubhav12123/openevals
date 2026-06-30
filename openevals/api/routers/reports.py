@@ -1,9 +1,13 @@
 """Generate a self-contained HTML report (print-to-PDF ready)."""
+
 from __future__ import annotations
+
 from datetime import datetime, timezone
+
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
-from openevals.api.routers.evaluate import _recent_evals, _total_count, _error_count
+
+from openevals.api.routers.evaluate import _error_count, _recent_evals, _total_count
 
 router = APIRouter()
 
@@ -70,25 +74,66 @@ async def generate_report():
             metric_totals.setdefault(m, []).append(s)
     agg = {m: round(sum(v) / len(v), 4) for m, v in metric_totals.items()}
     overall = round(sum(agg.values()) / len(agg) * 100, 1) if agg else 0
-    avg_latency = round(sum(e["latency_ms"] for e in evals) / len(evals), 1) if evals else 0
+    avg_latency = (
+        round(sum(e["latency_ms"] for e in evals) / len(evals), 1) if evals else 0
+    )
 
     # Leaderboard
     lb = [
-        {"rank": 1, "model": "claude-3-5-sonnet-20241022", "hallucination": 0.96, "faithfulness": 0.94, "relevance": 0.91, "coherence": 0.93},
-        {"rank": 2, "model": "gpt-4o",                    "hallucination": 0.77, "faithfulness": 0.91, "relevance": 0.93, "coherence": 0.92},
-        {"rank": 3, "model": "gpt-4o-mini",               "hallucination": 0.81, "faithfulness": 0.87, "relevance": 0.88, "coherence": 0.88},
-        {"rank": 4, "model": "llama-3-70b",               "hallucination": 0.82, "faithfulness": 0.85, "relevance": 0.87, "coherence": 0.84},
-        {"rank": 5, "model": "mistral-7b",                "hallucination": 0.78, "faithfulness": 0.80, "relevance": 0.83, "coherence": 0.79},
+        {
+            "rank": 1,
+            "model": "claude-3-5-sonnet-20241022",
+            "hallucination": 0.96,
+            "faithfulness": 0.94,
+            "relevance": 0.91,
+            "coherence": 0.93,
+        },
+        {
+            "rank": 2,
+            "model": "gpt-4o",
+            "hallucination": 0.77,
+            "faithfulness": 0.91,
+            "relevance": 0.93,
+            "coherence": 0.92,
+        },
+        {
+            "rank": 3,
+            "model": "gpt-4o-mini",
+            "hallucination": 0.81,
+            "faithfulness": 0.87,
+            "relevance": 0.88,
+            "coherence": 0.88,
+        },
+        {
+            "rank": 4,
+            "model": "llama-3-70b",
+            "hallucination": 0.82,
+            "faithfulness": 0.85,
+            "relevance": 0.87,
+            "coherence": 0.84,
+        },
+        {
+            "rank": 5,
+            "model": "mistral-7b",
+            "hallucination": 0.78,
+            "faithfulness": 0.80,
+            "relevance": 0.83,
+            "coherence": 0.79,
+        },
     ]
 
     # Metric rows
-    metric_rows = "".join(
-        f"<tr><td><b>{m.replace('_',' ').title()}</b></td>"
-        f"<td>{_bar_html(s)}</td>"
-        f"<td>{_score_badge(s)}</td>"
-        f"<td>{len(metric_totals.get(m,[]))}</td></tr>"
-        for m, s in sorted(agg.items(), key=lambda x: -x[1])
-    ) if agg else "<tr><td colspan='4' style='text-align:center;color:#94a3b8'>No evaluations yet</td></tr>"
+    metric_rows = (
+        "".join(
+            f"<tr><td><b>{m.replace('_',' ').title()}</b></td>"  # noqa: E231
+            f"<td>{_bar_html(s)}</td>"
+            f"<td>{_score_badge(s)}</td>"
+            f"<td>{len(metric_totals.get(m,[]))}</td></tr>"  # noqa: E231
+            for m, s in sorted(agg.items(), key=lambda x: -x[1])
+        )
+        if agg
+        else "<tr><td colspan='4' style='text-align:center;color:#94a3b8'>No evaluations yet</td></tr>"
+    )
 
     # Leaderboard rows
     lb_rows = "".join(
@@ -101,13 +146,17 @@ async def generate_report():
     )
 
     # Recent evals rows
-    recent_rows = "".join(
-        f"<tr><td style='max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'>{ev['prompt']}</td>"
-        f"<td>{_score_badge(ev['overall_score'])}</td>"
-        f"<td>{ev['latency_ms']}ms</td>"
-        f"<td style='font-size:11px;color:#94a3b8'>{ev['created_at'][:16].replace('T',' ')}</td></tr>"
-        for ev in evals[:15]
-    ) if evals else "<tr><td colspan='4' style='text-align:center;color:#94a3b8'>No evaluations yet</td></tr>"
+    recent_rows = (
+        "".join(
+            f"<tr><td style='max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'>{ev['prompt']}</td>"
+            f"<td>{_score_badge(ev['overall_score'])}</td>"
+            f"<td>{ev['latency_ms']}ms</td>"
+            f"<td style='font-size:11px;color:#94a3b8'>{ev['created_at'][:16].replace('T',' ')}</td></tr>"  # noqa: E231
+            for ev in evals[:15]
+        )
+        if evals
+        else "<tr><td colspan='4' style='text-align:center;color:#94a3b8'>No evaluations yet</td></tr>"
+    )
 
     error_rate = round(errors / total * 100, 2) if total > 0 else 0
 

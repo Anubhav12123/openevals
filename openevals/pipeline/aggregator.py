@@ -1,7 +1,9 @@
 from typing import Dict, List
+
 import numpy as np
-from openevals.types import EvaluationResult
+
 from openevals.stats.bootstrap import bootstrap_ci
+from openevals.types import EvaluationResult
 
 
 def aggregate_results(results: List[EvaluationResult]) -> Dict[str, Dict]:

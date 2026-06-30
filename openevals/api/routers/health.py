@@ -9,7 +9,9 @@ async def health_check():
     db_ok = False
     try:
         from sqlalchemy import text
+
         from openevals.db.connection import AsyncSessionLocal
+
         async with AsyncSessionLocal() as session:
             await session.execute(text("SELECT 1"))
         db_ok = True

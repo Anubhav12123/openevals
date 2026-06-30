@@ -1,11 +1,16 @@
 from typing import Optional
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+    )
 
-    database_url: str = "postgresql+asyncpg://openevals:password@localhost:5432/openevals"
+    database_url: str = (
+        "postgresql+asyncpg://openevals:password@localhost:5432/openevals"
+    )
     database_pool_size: int = 20
     database_max_overflow: int = 10
 

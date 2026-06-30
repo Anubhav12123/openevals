@@ -18,5 +18,14 @@ def test_shifted_distributions_detected():
 
 def test_result_has_required_keys():
     result = detect_distributional_shift([0.5] * 10, [0.6] * 10)
-    for key in ["shift_detected", "ks_statistic", "p_value", "psi", "severity", "reference_mean", "current_mean", "mean_shift"]:
+    for key in [
+        "shift_detected",
+        "ks_statistic",
+        "p_value",
+        "psi",
+        "severity",
+        "reference_mean",
+        "current_mean",
+        "mean_shift",
+    ]:
         assert key in result

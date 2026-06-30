@@ -1,9 +1,10 @@
 import hashlib
-import hmac
 import uuid
+from typing import List
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from typing import List
+
 from openevals.api.middleware.auth import require_api_key
 
 router = APIRouter()
@@ -31,14 +32,18 @@ async def create_webhook(body: WebhookCreate, api_key: dict = Depends(require_ap
 
 @router.get("/webhooks")
 async def list_webhooks(api_key: dict = Depends(require_api_key)):
-    return {"webhooks": [
-        {k: v for k, v in wh.items() if k != "secret_hash"}
-        for wh in _webhooks.values()
-    ]}
+    return {
+        "webhooks": [
+            {k: v for k, v in wh.items() if k != "secret_hash"}
+            for wh in _webhooks.values()
+        ]
+    }
 
 
 @router.delete("/webhooks/{webhook_id}")
-async def delete_webhook(webhook_id: uuid.UUID, api_key: dict = Depends(require_api_key)):
+async def delete_webhook(
+    webhook_id: uuid.UUID, api_key: dict = Depends(require_api_key)
+):
     if str(webhook_id) not in _webhooks:
         raise HTTPException(status_code=404, detail="Webhook not found")
     del _webhooks[str(webhook_id)]

@@ -1,4 +1,5 @@
 from typing import Any, Dict, List
+
 import numpy as np
 from scipy import stats
 
@@ -20,10 +21,13 @@ def welch_ttest(
         "significant": bool(p_value < alpha),
         "cohens_d": cohens_d,
         "effect_size": (
-            "negligible" if abs(cohens_d) < 0.2
-            else "small" if abs(cohens_d) < 0.5
-            else "medium" if abs(cohens_d) < 0.8
-            else "large"
+            "negligible"
+            if abs(cohens_d) < 0.2
+            else (
+                "small"
+                if abs(cohens_d) < 0.5
+                else "medium" if abs(cohens_d) < 0.8 else "large"
+            )
         ),
         "mean_a": float(np.mean(a)),
         "mean_b": float(np.mean(b)),

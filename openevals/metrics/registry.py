@@ -1,8 +1,9 @@
 from __future__ import annotations
+
 import importlib as _importlib
 from typing import Dict, Type
-from openevals.metrics.base import BaseMetric
 
+from openevals.metrics.base import BaseMetric
 
 _BUILTIN: Dict[str, str] = {
     "faithfulness": "openevals.metrics.faithfulness:FaithfulnessMetric",
@@ -32,6 +33,7 @@ class MetricRegistry:
         # Check entry points for third-party plugins
         try:
             import importlib.metadata
+
             for ep in importlib.metadata.entry_points(group="openevals.metrics"):
                 if ep.name == name:
                     cls = ep.load()
@@ -46,6 +48,7 @@ class MetricRegistry:
         names = list(_BUILTIN.keys())
         try:
             import importlib.metadata
+
             for ep in importlib.metadata.entry_points(group="openevals.metrics"):
                 if ep.name not in names:
                     names.append(ep.name)

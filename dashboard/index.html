@@ -438,9 +438,13 @@ function mkCompare() {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 async function apiFetch(path) {
-  const r=await fetch(API+path);
-  if(!r.ok) throw new Error(`HTTP ${r.status}`);
-  return r.json();
+  const ctrl=new AbortController();
+  const t=setTimeout(()=>ctrl.abort(),5000);
+  try {
+    const r=await fetch(API+path,{signal:ctrl.signal});
+    if(!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.json();
+  } finally { clearTimeout(t); }
 }
 function sc(s){return s>=0.85?'#4ade80':s>=0.65?'#facc15':'#f87171'}
 function pc(s){return s>=0.85?'pg':s>=0.65?'py':'pr'}
@@ -508,23 +512,25 @@ function renderStats(d) {
 async function refreshAll() {
   const badge=document.getElementById('conn');
   badge.textContent='connecting…';badge.className='conn-badge wait';
-  const [r0,r1,r2,r3]=await Promise.allSettled([
-    apiFetch('/v1/stats'),apiFetch('/v1/metrics/aggregate'),
-    apiFetch('/v1/rankings'),apiFetch('/v1/feed?limit=6'),
-  ]);
-  let anyOk=false;
-  if(r0.status==='fulfilled'){renderStats(r0.value);anyOk=true;}
-  if(r1.status==='fulfilled'){renderBars(r1.value.metrics,r1.value.sample_size);
-    const vals=Object.values(r1.value.metrics);
-    const overall=vals.length?Math.round(vals.reduce((a,b)=>a+b,0)/vals.length*100):0;
-    mkDonut(overall);
-    const tot=r0.status==='fulfilled'?r0.value.total_evaluations.toLocaleString():'—';
-    document.getElementById('donut-num').innerHTML=`${overall}%<br><span style="font-size:12px;color:var(--muted);font-weight:400">${tot} evals</span>`;
-    anyOk=true;}
-  if(r2.status==='fulfilled'){renderLB(r2.value.leaderboard);anyOk=true;}
-  if(r3.status==='fulfilled'){renderRecent(r3.value.evaluations);anyOk=true;}
-  badge.textContent=anyOk?'● Connected':'● Offline';
-  badge.className=anyOk?'conn-badge ok':'conn-badge off';
+  let d=null;
+  // Use server-injected data if fetch is blocked (ad-blocker resilience)
+  try { d=await apiFetch('/d'); } catch(e) { d=window.__INIT__||null; }
+  if(!d && window.__INIT__) d=window.__INIT__;
+  if(d) {
+    try{renderStats(d.stats);}catch(e){console.warn('renderStats',e);}
+    try{
+      renderBars(d.metrics.metrics,d.metrics.sample_size);
+      const vals=Object.values(d.metrics.metrics);
+      const overall=vals.length?Math.round(vals.reduce((a,b)=>a+b,0)/vals.length*100):0;
+      mkDonut(overall);
+      document.getElementById('donut-num').innerHTML=`${overall}%<br><span style="font-size:12px;color:var(--muted);font-weight:400">${d.stats.total_evaluations.toLocaleString()} evals</span>`;
+    }catch(e){console.warn('renderBars',e);}
+    try{renderLB(d.leaderboard);}catch(e){console.warn('renderLB',e);}
+    try{renderRecent(d.recent);}catch(e){console.warn('renderRecent',e);}
+    badge.textContent='● Connected';badge.className='conn-badge ok';
+  } else {
+    badge.textContent='● Offline';badge.className='conn-badge off';
+  }
 }
 
 // ── Page nav ─────────────────────────────────────────────────────────────────

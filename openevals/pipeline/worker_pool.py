@@ -1,10 +1,12 @@
 from __future__ import annotations
+
 import asyncio
 import time
 from typing import List
-from openevals.types import EvaluationRequest, EvaluationResult, MetricResult
+
 from openevals.metrics.registry import MetricRegistry
 from openevals.pipeline.retry import retry_with_backoff
+from openevals.types import EvaluationRequest, EvaluationResult, MetricResult
 
 
 class WorkerPool:
@@ -23,7 +25,9 @@ class WorkerPool:
         self._eval_count = 0
         self._window_start = time.monotonic()
 
-    async def process_batch(self, requests: List[EvaluationRequest]) -> List[EvaluationResult]:
+    async def process_batch(
+        self, requests: List[EvaluationRequest]
+    ) -> List[EvaluationResult]:
         tasks = [self._process_single(req) for req in requests]
         return list(await asyncio.gather(*tasks))
 
@@ -34,7 +38,9 @@ class WorkerPool:
                 self._run_metric(name, metric, request)
                 for name, metric in self.metrics.items()
             ]
-            metric_results: List[MetricResult] = list(await asyncio.gather(*metric_tasks))
+            metric_results: List[MetricResult] = list(
+                await asyncio.gather(*metric_tasks)
+            )
             total_ms = (time.perf_counter() - start) * 1000
             return EvaluationResult(
                 request=request,
@@ -43,7 +49,9 @@ class WorkerPool:
                 total_latency_ms=total_ms,
             )
 
-    async def _run_metric(self, name: str, metric, request: EvaluationRequest) -> MetricResult:
+    async def _run_metric(
+        self, name: str, metric, request: EvaluationRequest
+    ) -> MetricResult:
         try:
             return await asyncio.wait_for(
                 retry_with_backoff(metric.compute, request, max_retries=3),
@@ -51,11 +59,17 @@ class WorkerPool:
             )
         except asyncio.TimeoutError:
             return MetricResult(
-                metric_name=name, score=0.0, ci_lower=0.0, ci_upper=0.0,
+                metric_name=name,
+                score=0.0,
+                ci_lower=0.0,
+                ci_upper=0.0,
                 explanation=f"Timed out after {self.timeout}s",
             )
         except Exception as e:
             return MetricResult(
-                metric_name=name, score=0.0, ci_lower=0.0, ci_upper=0.0,
+                metric_name=name,
+                score=0.0,
+                ci_lower=0.0,
+                ci_upper=0.0,
                 raw_output=f"Error: {e}",
             )

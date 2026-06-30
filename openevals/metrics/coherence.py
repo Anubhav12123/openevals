@@ -1,9 +1,11 @@
 from __future__ import annotations
+
 import json
 import time
+
+from openevals.config import settings
 from openevals.metrics.base import BaseMetric
 from openevals.types import EvaluationRequest, MetricResult
-from openevals.config import settings
 
 RUBRIC = """Rate the COHERENCE of this response (logical flow, internal consistency, clear structure).
 
@@ -16,19 +18,28 @@ Return JSON: {{"score": <float 0.0-1.0>, "explanation": "<brief>", "issues": ["<
 
 class CoherenceMetric(BaseMetric):
     name = "coherence"
-    description = "GPT-4o-mini judges logical structure and coherence (heuristic fallback)"
+    description = (
+        "GPT-4o-mini judges logical structure and coherence (heuristic fallback)"
+    )
 
     async def compute(self, request: EvaluationRequest) -> MetricResult:
         if settings.openai_api_key:
             try:
                 import openai
+
                 client = openai.AsyncOpenAI(api_key=settings.openai_api_key)
                 start = time.perf_counter()
                 resp = await client.chat.completions.create(
                     model="gpt-4o-mini",
-                    messages=[{"role": "user", "content": RUBRIC.format(
-                        prompt=request.prompt[:500], response=request.response[:1000]
-                    )}],
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": RUBRIC.format(
+                                prompt=request.prompt[:500],
+                                response=request.response[:1000],
+                            ),
+                        }
+                    ],
                     response_format={"type": "json_object"},
                     temperature=0.0,
                 )
@@ -51,4 +62,6 @@ class CoherenceMetric(BaseMetric):
             return self._make_result(score=0.1, explanation="Empty response")
         avg_words = sum(len(s.split()) for s in sentences) / len(sentences)
         score = 0.75 if 8 <= avg_words <= 30 else (0.5 if avg_words < 3 else 0.6)
-        return self._make_result(score=score, explanation=f"Heuristic (avg {avg_words:.1f} words/sentence)")
+        return self._make_result(
+            score=score, explanation=f"Heuristic (avg {avg_words:.1f} words/sentence)"
+        )

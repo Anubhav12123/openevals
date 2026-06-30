@@ -1,8 +1,10 @@
 from __future__ import annotations
+
 import json
+
+from openevals.config import settings
 from openevals.metrics.base import BaseMetric
 from openevals.types import EvaluationRequest, MetricResult
-from openevals.config import settings
 
 PROMPT = """Score how PRECISE the retrieved context is — what fraction is actually relevant to the question.
 Question: {prompt}
@@ -12,7 +14,9 @@ Return JSON: {{"score": <float 0.0-1.0>, "explanation": "<brief>"}}"""
 
 class ContextPrecisionMetric(BaseMetric):
     name = "context_precision"
-    description = "RAGAS context precision: fraction of retrieved context relevant to the query"
+    description = (
+        "RAGAS context precision: fraction of retrieved context relevant to the query"
+    )
     requires_context = True
 
     async def compute(self, request: EvaluationRequest) -> MetricResult:
@@ -20,12 +24,19 @@ class ContextPrecisionMetric(BaseMetric):
         if settings.openai_api_key:
             try:
                 import openai
+
                 client = openai.AsyncOpenAI(api_key=settings.openai_api_key)
                 resp = await client.chat.completions.create(
                     model="gpt-4o-mini",
-                    messages=[{"role": "user", "content": PROMPT.format(
-                        prompt=request.prompt[:500], context=(request.context or "")[:1000]
-                    )}],
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": PROMPT.format(
+                                prompt=request.prompt[:500],
+                                context=(request.context or "")[:1000],
+                            ),
+                        }
+                    ],
                     response_format={"type": "json_object"},
                     temperature=0.0,
                 )
@@ -39,7 +50,10 @@ class ContextPrecisionMetric(BaseMetric):
                 pass
         # Embedding fallback
         from openevals.metrics.relevance import RelevanceMetric
+
         rel = RelevanceMetric()
         ctx_req = request.model_copy(update={"response": request.context or ""})
         result = await rel.compute(ctx_req)
-        return self._make_result(score=result.score, explanation=f"Embedding precision: {result.score:.3f}")
+        return self._make_result(
+            score=result.score, explanation=f"Embedding precision: {result.score:.3f}"
+        )

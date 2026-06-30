@@ -1,4 +1,5 @@
 import pytest
+
 from openevals.metrics.citation_accuracy import CitationAccuracyMetric, _extract_urls
 from openevals.types import EvaluationRequest
 
@@ -17,7 +18,9 @@ def test_no_urls_scores_one():
 @pytest.mark.asyncio
 async def test_no_citations_perfect_score():
     metric = CitationAccuracyMetric()
-    req = EvaluationRequest(prompt="What is AI?", response="AI is artificial intelligence.")
+    req = EvaluationRequest(
+        prompt="What is AI?", response="AI is artificial intelligence."
+    )
     result = await metric.compute(req)
     assert result.score == 1.0
     assert result.metric_name == "citation_accuracy"

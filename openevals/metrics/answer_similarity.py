@@ -1,7 +1,10 @@
 from __future__ import annotations
+
 import asyncio
 from functools import lru_cache
+
 import numpy as np
+
 from openevals.metrics.base import BaseMetric
 from openevals.types import EvaluationRequest, MetricResult
 
@@ -9,6 +12,7 @@ from openevals.types import EvaluationRequest, MetricResult
 @lru_cache(maxsize=1)
 def _get_sbert():
     from sentence_transformers import SentenceTransformer
+
     return SentenceTransformer("all-MiniLM-L6-v2")
 
 

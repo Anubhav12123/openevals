@@ -1,4 +1,3 @@
-import pytest
 from openevals.stats.significance import welch_ttest
 
 
@@ -20,5 +19,14 @@ def test_no_difference_not_significant():
 
 def test_result_has_required_keys():
     result = welch_ttest([0.5] * 5, [0.6] * 5)
-    for key in ["t_statistic", "p_value", "significant", "cohens_d", "effect_size", "mean_a", "mean_b", "difference"]:
+    for key in [
+        "t_statistic",
+        "p_value",
+        "significant",
+        "cohens_d",
+        "effect_size",
+        "mean_a",
+        "mean_b",
+        "difference",
+    ]:
         assert key in result

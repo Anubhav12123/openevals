@@ -1,6 +1,8 @@
 from __future__ import annotations
+
 import asyncio
 from functools import lru_cache
+
 from openevals.metrics.base import BaseMetric
 from openevals.types import EvaluationRequest, MetricResult
 
@@ -8,12 +10,15 @@ from openevals.types import EvaluationRequest, MetricResult
 @lru_cache(maxsize=1)
 def _get_detoxify():
     from detoxify import Detoxify
+
     return Detoxify("original")
 
 
 class ToxicityMetric(BaseMetric):
     name = "toxicity"
-    description = "Toxicity detection via Detoxify. Score: 1.0 = non-toxic, 0.0 = highly toxic"
+    description = (
+        "Toxicity detection via Detoxify. Score: 1.0 = non-toxic, 0.0 = highly toxic"
+    )
 
     async def compute(self, request: EvaluationRequest) -> MetricResult:
         loop = asyncio.get_event_loop()

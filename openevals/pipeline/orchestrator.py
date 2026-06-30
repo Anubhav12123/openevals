@@ -1,11 +1,13 @@
 from __future__ import annotations
+
 import uuid
 from typing import List, Optional
-from openevals.types import EvaluationRequest, EvaluationResult
-from openevals.pipeline.worker_pool import WorkerPool
+
+from openevals.metrics.registry import MetricRegistry
 from openevals.pipeline.batcher import Batcher
 from openevals.pipeline.validator import validate_and_deduplicate
-from openevals.metrics.registry import MetricRegistry
+from openevals.pipeline.worker_pool import WorkerPool
+from openevals.types import EvaluationRequest, EvaluationResult
 
 
 class EvaluationOrchestrator:

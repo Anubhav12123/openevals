@@ -1,10 +1,13 @@
 from __future__ import annotations
+
 import asyncio
 from abc import ABC, abstractmethod
 from typing import List
+
 import numpy as np
-from openevals.types import EvaluationRequest, MetricResult
+
 from openevals.exceptions import MetricInputError
+from openevals.types import EvaluationRequest, MetricResult
 
 
 class BaseMetric(ABC):
@@ -14,10 +17,11 @@ class BaseMetric(ABC):
     requires_context: bool = False
 
     @abstractmethod
-    async def compute(self, request: EvaluationRequest) -> MetricResult:
-        ...
+    async def compute(self, request: EvaluationRequest) -> MetricResult: ...
 
-    async def compute_batch(self, requests: List[EvaluationRequest]) -> List[MetricResult]:
+    async def compute_batch(
+        self, requests: List[EvaluationRequest]
+    ) -> List[MetricResult]:
         return list(await asyncio.gather(*[self.compute(r) for r in requests]))
 
     def validate_input(self, request: EvaluationRequest) -> None:

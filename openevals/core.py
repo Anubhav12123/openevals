@@ -1,9 +1,11 @@
 from __future__ import annotations
+
 import asyncio
 import time
 from typing import List, Optional
-from openevals.types import EvaluationRequest, EvaluationResult, MetricResult
+
 from openevals.metrics.registry import MetricRegistry
+from openevals.types import EvaluationRequest, EvaluationResult, MetricResult
 
 
 class Evaluator:
@@ -82,7 +84,9 @@ class Evaluator:
 
         return list(await asyncio.gather(*[bounded(r) for r in requests]))
 
-    async def _run_metric(self, name: str, metric, request: EvaluationRequest) -> MetricResult:
+    async def _run_metric(
+        self, name: str, metric, request: EvaluationRequest
+    ) -> MetricResult:
         try:
             return await metric.compute(request)
         except Exception as e:
