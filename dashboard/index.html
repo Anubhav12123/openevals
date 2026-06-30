@@ -509,13 +509,19 @@ function renderStats(d) {
 }
 
 // ── Main refresh ──────────────────────────────────────────────────────────────
+let _firstLoad=true;
 async function refreshAll() {
   const badge=document.getElementById('conn');
   badge.textContent='connecting…';badge.className='conn-badge wait';
   let d=null;
-  // Use server-injected data if fetch is blocked (ad-blocker resilience)
-  try { d=await apiFetch('/d'); } catch(e) { d=window.__INIT__||null; }
-  if(!d && window.__INIT__) d=window.__INIT__;
+  // On first load use server-injected data (no fetch — bypasses ad-blockers completely)
+  if(_firstLoad && window.__INIT__) {
+    d=window.__INIT__;
+    _firstLoad=false;
+  } else {
+    try { d=await apiFetch('/d'); } catch(e) { d=window.__INIT__||null; }
+    _firstLoad=false;
+  }
   if(d) {
     try{renderStats(d.stats);}catch(e){console.warn('renderStats',e);}
     try{

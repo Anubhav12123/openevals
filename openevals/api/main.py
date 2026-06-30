@@ -106,8 +106,78 @@ if _DASHBOARD_DIR.exists():
             "recent": evals[:6],
         }
         html = (_DASHBOARD_DIR / "index.html").read_text()
+        # Inject data for JS live updates
         inject = f"<script>window.__INIT__={_json.dumps(init_data)};</script>"
         html = html.replace("</head>", inject + "</head>", 1)
+        # Server-render key values directly into HTML (works even if JS/fetch blocked)
+        html = html.replace(
+            'class="conn-badge wait">connecting…<',
+            'class="conn-badge ok">● Connected<',
+            1,
+        )
+        html = html.replace(
+            'class="sm-val" id="s-total">—<',
+            f'class="sm-val" id="s-total">{_total_count}<',
+            1,
+        )
+        html = html.replace(
+            'id="s-lat">—<',
+            f'id="s-lat">{avg_latency}ms<',
+            1,
+        )
+        html = html.replace(
+            'id="o-latency">—ms<',
+            f'id="o-latency">{avg_latency}ms<',
+            1,
+        )
+        html = html.replace(
+            'id="s-err">—<',
+            f'id="s-err">{error_rate}%<',
+            1,
+        )
+        # Render leaderboard rows (replace skeleton content inside lb-rows div)
+        import re as _re
+
+        def _pill(s: float) -> str:
+            return "pg" if s >= 0.85 else "py" if s >= 0.65 else "pr"
+
+        lb_html = "".join(
+            f'<div class="lb-row">'
+            f'<span class="lb-rank">{r["rank"]}</span>'
+            f'<i class="ti ti-cpu" style="font-size:12px;color:var(--muted)"></i>'
+            f'<span class="lb-name">{r["model"]}</span>'
+            f'<span class="pill {_pill(r["hallucination"])}">'
+            f'{r["hallucination"]:.2f}</span></div>'
+            for r in _BENCHMARK_SCORES
+        )
+        html = _re.sub(
+            r'id="lb-rows">.*?</div>',
+            f'id="lb-rows">{lb_html}</div>',
+            html,
+            count=1,
+            flags=_re.DOTALL,
+        )
+
+        # Render recent evals (replace skeleton content inside recent-list div)
+        def _sc(s: float) -> str:
+            return "#4ade80" if s >= 0.85 else "#facc15" if s >= 0.65 else "#f87171"
+
+        recent_html = "".join(
+            f'<div class="ev-row">'
+            f'<div class="sdot" style="background:{_sc(ev["overall_score"])}"></div>'
+            f'<span class="ev-prompt" title="{ev["prompt"]}">{ev["prompt"][:60]}</span>'
+            f'<span class="ev-score" style="color:{_sc(ev["overall_score"])}">'
+            f'{ev["overall_score"]:.2f}</span></div>'
+            for ev in evals[:6]
+        )
+        if recent_html:
+            html = _re.sub(
+                r'id="recent-list">.*?</div>',
+                f'id="recent-list">{recent_html}</div>',
+                html,
+                count=1,
+                flags=_re.DOTALL,
+            )
         return HTMLResponse(content=html, headers={"Cache-Control": "no-store"})
 
 
