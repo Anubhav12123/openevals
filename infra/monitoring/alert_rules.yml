@@ -1,0 +1,37 @@
+groups:
+  - name: openevals_alerts
+    rules:
+      - alert: HighEvaluationErrorRate
+        expr: rate(openevals_evaluations_total{status="failed"}[5m]) / rate(openevals_evaluations_total[5m]) > 0.01
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Evaluation error rate > 1%"
+          description: "More than 1% of evaluations are failing over the last 5 minutes."
+
+      - alert: HighQueueDepth
+        expr: openevals_pipeline_queue_depth > 1000
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Evaluation queue depth > 1000"
+          description: "The evaluation pipeline queue has more than 1000 pending evaluations."
+
+      - alert: LowThroughput
+        expr: openevals_pipeline_throughput < 10
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pipeline throughput < 10 evals/sec"
+          description: "Evaluation throughput has dropped below 10 per second."
+
+      - alert: APIHighLatency
+        expr: histogram_quantile(0.95, rate(openevals_api_latency_seconds_bucket[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "API p95 latency > 2s"
