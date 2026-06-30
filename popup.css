@@ -31,6 +31,9 @@ input:checked + .slider::before{transform:translateX(22px)}
 .footer-link{padding:11px 16px;font-size:12px;color:rgba(255,255,255,.35);cursor:pointer;transition:color .15s}
 .footer-link:hover{color:rgba(255,255,255,.6)}
 
+.settings-row{padding:10px 16px;font-size:11px;color:rgba(255,255,255,.25);cursor:pointer;transition:color .15s}
+.settings-row:hover{color:rgba(255,255,255,.5)}
+
 .history{padding:0 16px 10px;max-height:180px;overflow-y:auto}
 .history.hidden{display:none}
 .history::-webkit-scrollbar{width:3px}

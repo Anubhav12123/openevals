@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>OpenEvals — Settings</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:#0f0f0f;color:#e2e8f0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;display:flex;justify-content:center;padding:60px 20px}
+    .card{background:#1a1a1a;border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:36px;width:100%;max-width:480px}
+    h1{font-size:20px;font-weight:700;color:#fff;margin-bottom:6px}
+    .sub{font-size:13px;color:rgba(255,255,255,.4);margin-bottom:32px;line-height:1.5}
+    label{display:block;font-size:12px;font-weight:600;color:rgba(255,255,255,.5);letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px}
+    input{width:100%;padding:11px 14px;background:#111;border:1px solid rgba(255,255,255,.1);border-radius:10px;color:#fff;font-size:13px;font-family:inherit;outline:none;transition:border-color .15s}
+    input:focus{border-color:rgba(99,102,241,.6)}
+    .hint{font-size:11px;color:rgba(255,255,255,.3);margin-top:8px;line-height:1.6}
+    .hint a{color:#818cf8;text-decoration:none}
+    .hint a:hover{text-decoration:underline}
+    button{margin-top:24px;width:100%;padding:12px;background:#4f6ef7;border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s}
+    button:hover{background:#4058d4}
+    .status{margin-top:14px;font-size:12px;text-align:center;height:16px;color:#4ade80}
+    .divider{height:1px;background:rgba(255,255,255,.07);margin:28px 0}
+    .info-row{display:flex;justify-content:space-between;font-size:12px;color:rgba(255,255,255,.35);margin-bottom:8px}
+    .info-val{color:rgba(255,255,255,.6);font-weight:500}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>OpenEvals Settings</h1>
+    <p class="sub">Connect your free Groq API key to enable AI-powered prompt suggestions instead of templates.</p>
+
+    <label for="api-key">Groq API Key</label>
+    <input type="password" id="api-key" placeholder="gsk_••••••••••••••••••••••••"/>
+    <p class="hint">
+      Get a free key at <a href="https://console.groq.com" target="_blank">console.groq.com</a>.
+      Your key is stored locally and never sent anywhere except Groq's API.
+    </p>
+
+    <button id="save-btn">Save Key</button>
+    <div class="status" id="status"></div>
+
+    <div class="divider"></div>
+
+    <div class="info-row"><span>Model</span><span class="info-val">llama-3.1-8b-instant</span></div>
+    <div class="info-row"><span>Fallback</span><span class="info-val">Template suggestions (no key needed)</span></div>
+    <div class="info-row"><span>Data sent</span><span class="info-val">Your prompt + Groq API only</span></div>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>
