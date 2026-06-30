@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "PromptGuard",
+  "name": "OpenEvals",
   "version": "1.0.0",
-  "description": "Real-time hallucination detection and smarter prompt suggestions for ChatGPT, Claude, and Gemini.",
+  "description": "Real-time hallucination detection for ChatGPT, Claude, and Gemini.",
   "permissions": ["storage", "scripting", "tabs"],
   "host_permissions": [
     "https://chatgpt.com/*",
