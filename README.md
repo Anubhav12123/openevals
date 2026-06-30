@@ -1,17 +1,17 @@
-# PromptGuard
+# OpenEvals
 
-**Real-time hallucination detection and smarter prompt suggestions for AI chatbots.**
+**Real-time hallucination detection for AI chatbots — right in your browser.**
 
-PromptGuard is a Chrome extension that sits on top of ChatGPT, Claude, and Gemini. It automatically scores every AI response for hallucination risk and — when the risk is high — shows you three better ways to ask your question so you get a more accurate answer.
+OpenEvals is a Chrome extension that scores every AI response for hallucination risk as it streams in. When the risk is medium or high, it automatically surfaces three smarter ways to re-ask your question so you get more accurate answers.
 
 ---
 
 ## What it does
 
-- **Hallucination score badge** — appears under every AI response showing risk level (LOW / MEDIUM / HIGH) with a percentage
-- **Smart prompt suggestions** — when risk is high, a popup slides in with 3 rewritten versions of your question designed to reduce hallucination
-- **One-click refill** — click "Use this" on any suggestion and it auto-fills the chatbox
-- **Session stats** — click the extension icon to see how many responses were evaluated, how many were high risk, and your full history
+- **Live hallucination score badge** — appears under every AI response the moment it finishes, showing risk level (LOW / MEDIUM / HIGH) with a percentage
+- **Smarter prompt suggestions** — when risk is detected, a popup shows 3 rewritten versions of your question designed to reduce uncertainty
+- **One-click refill** — click "Use ↵" on any suggestion and it auto-fills the chatbox
+- **Session stats** — click the extension icon to see responses evaluated, high-risk count, average risk score, and session protection rate
 
 ---
 
@@ -25,32 +25,33 @@ PromptGuard is a Chrome extension that sits on top of ChatGPT, Claude, and Gemin
 
 ---
 
-## How to install (Chrome)
+## How to install
 
 1. Clone or download this repo
 2. Open Chrome and go to `chrome://extensions`
 3. Enable **Developer mode** (toggle in the top right)
 4. Click **Load unpacked**
-5. Select the folder containing `manifest.json`
-6. The 🛡 PromptGuard icon appears in your toolbar
+5. Select the `openevals` folder
+6. The OpenEvals icon appears in your toolbar
 
 ---
 
 ## How hallucination is scored
 
-PromptGuard uses a client-side heuristic analyser — no API calls, no data sent anywhere. It scans each response for:
+OpenEvals uses a client-side heuristic analyser — no API calls, no data sent anywhere. It scans each response for:
 
-- **High-risk signals** — "I think", "I believe", "I'm not sure", "to my knowledge", "if I recall correctly", "I may be wrong"
-- **Medium-risk signals** — "approximately", "roughly", "seems like", "generally", "typically"
-- **Confidence signals** — "according to research", "studies show", "specifically", "it is confirmed" (these reduce the score)
+- **High-risk signals** — "I think", "I believe", "might", "possibly", "perhaps", "I'm not sure", "to my knowledge", "I cannot verify"
+- **Medium-risk signals** — "approximately", "roughly", "generally", "typically", "usually", "likely", "potentially"
+- **Confidence signals** — "according to research", "confirmed", "proven", "definitely" (these reduce the score)
 
-A weighted sum produces a risk percentage. Above 35% triggers the suggestion popup.
+A weighted sum produces a risk percentage. Above 20% shows the badge; above 35% auto-triggers the prompt suggestions popup.
 
 ---
 
 ## How prompt suggestions work
 
-When high risk is detected, PromptGuard rewrites your original question three ways:
+When risk is detected, OpenEvals rewrites your original question three ways:
+
 1. Asks the AI to flag anything it is uncertain about
 2. Asks for a step-by-step breakdown with sources
 3. Asks for a precise, factual answer with no speculation
@@ -62,11 +63,11 @@ All suggestions are generated locally — no external API required.
 ## Project structure
 
 ```
-promptguard/
+openevals/
 ├── manifest.json     — Chrome extension config (Manifest V3)
 ├── content.js        — Injected into chatbot pages; scoring + UI logic
 ├── content.css       — Styles for the badge and suggestion popup
-├── popup.html        — Extension icon popup (stats dashboard)
+├── popup.html        — Extension icon popup (session stats)
 ├── popup.js          — Popup data rendering
 ├── popup.css         — Popup styles
 ├── background.js     — Service worker (initialises storage on install)
