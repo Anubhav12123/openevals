@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from typing import List
 from groq import Groq
 import os
 
@@ -20,7 +21,7 @@ class SuggestRequest(BaseModel):
     response: str
 
 class SuggestResponse(BaseModel):
-    suggestions: list[str]
+    suggestions: List[str]
     model: str = "llama-3.1-8b-instant"
 
 @app.post("/suggest", response_model=SuggestResponse)
