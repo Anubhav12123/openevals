@@ -101,5 +101,5 @@ node tests/scoring.test.js
 
 ## Built by
 
-Anubhav Dixit · Michigan State University  
+Anubhav Dixit  
 [github.com/Anubhav12123](https://github.com/Anubhav12123)
