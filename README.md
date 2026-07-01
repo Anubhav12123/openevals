@@ -96,10 +96,3 @@ GROQ_API_KEY=your_key uvicorn main:app --reload
 ```bash
 node tests/scoring.test.js
 ```
-
----
-
-## Built by
-
-Anubhav Dixit  
-[github.com/Anubhav12123](https://github.com/Anubhav12123)
